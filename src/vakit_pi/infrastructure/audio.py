@@ -27,7 +27,12 @@ class BaseAudioPlayer(AudioPlayerPort, ABC):
         """Player kullanılabilir mi?"""
 
     async def play(self, file_path: str, volume: int = 100) -> None:
-        """Ses dosyası çal."""
+        """Ses dosyası çal ve bitmesini bekle."""
+        await self._start_playback(file_path, volume)
+        await self._wait_for_completion()
+
+    async def _start_playback(self, file_path: str, volume: int = 100) -> None:
+        """Ses dosyasını çalmaya başla (beklemeden)."""
         if not Path(file_path).exists():
             raise FileNotFoundError(f"Ses dosyası bulunamadı: {file_path}")
 
@@ -40,21 +45,27 @@ class BaseAudioPlayer(AudioPlayerPort, ABC):
         self._current_volume = volume
         cmd = self._get_command(file_path, volume)
 
-        logger.debug(f"Çalma komutu: {' '.join(cmd)}")
+        logger.info(f"Ses çalma başlatılıyor: {' '.join(cmd)}")
 
         self._process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
         )
+        logger.info(f"Ses process başlatıldı: PID={self._process.pid}")
 
-        # Tamamlanmasını bekle
+    async def _wait_for_completion(self) -> None:
+        """Çalmanın bitmesini bekle."""
+        if self._process is None:
+            return
+
         _, stderr = await self._process.communicate()
 
-        if self._process.returncode != 0 and stderr:
-            error_msg = stderr.decode().strip()
-            if error_msg:
-                logger.warning(f"Player uyarısı: {error_msg}")
+        if self._process.returncode != 0:
+            error_msg = stderr.decode().strip() if stderr else ""
+            logger.warning(
+                f"Player çıkış kodu: {self._process.returncode}, hata: {error_msg}"
+            )
 
         self._process = None
 

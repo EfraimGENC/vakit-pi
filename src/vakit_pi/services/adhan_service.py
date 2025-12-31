@@ -142,29 +142,30 @@ class AdhanService:
             self._is_playing = True
             logger.info(f"Ses testi başlatılıyor (ses: {volume}%, süre: {duration}s)")
 
-            # Ses dosyasını background'da başlat
-            play_task = asyncio.create_task(
-                self._audio_player.play(str(adhan_path), volume=volume)
-            )
+            # Ses çalmayı başlat (beklemeden)
+            await self._audio_player._start_playback(str(adhan_path), volume=volume)
 
-            # Belirtilen süre kadar bekle veya dosya bitene kadar
-            try:
-                await asyncio.wait_for(play_task, timeout=duration)
-            except TimeoutError:
-                # Süre doldu, sesi durdur
+            # Belirtilen süre kadar bekle veya ses bitene kadar
+            elapsed = 0
+            check_interval = 0.5
+            while elapsed < duration and self._audio_player.is_playing():
+                await asyncio.sleep(check_interval)
+                elapsed += check_interval
+
+            # Hala çalıyorsa durdur
+            if self._audio_player.is_playing():
+                logger.info(f"Test süresi doldu ({duration}s), ses durduruluyor.")
                 await self._audio_player.stop()
-            except asyncio.CancelledError:
-                # Dışarıdan iptal edildi
-                await self._audio_player.stop()
-                raise
 
             logger.info("Ses testi tamamlandı.")
             return True
         except asyncio.CancelledError:
             logger.info("Ses testi iptal edildi.")
+            await self._audio_player.stop()
             return False
         except Exception as e:
             logger.error(f"Ses testi başarısız: {e}")
+            await self._audio_player.stop()
             return False
         finally:
             self._is_playing = False
