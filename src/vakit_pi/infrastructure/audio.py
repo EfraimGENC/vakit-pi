@@ -108,6 +108,8 @@ class Mpg123Player(BaseAudioPlayer):
         return [
             "mpg123",
             "--quiet",
+            "-o",
+            "pulse",  # PulseAudio çıkışı (Bluetooth için gerekli)
             "--scale",
             str(scaled_volume),
             file_path,

@@ -27,6 +27,10 @@ Environment="VAKIT_PI_PORT=8080"
 Environment="VAKIT_PI_LOG_LEVEL=INFO"
 Environment="VAKIT_PI_SETTINGS_PATH=/home/efraim/.config/vakit-pi/settings.json"
 
+# PulseAudio / Bluetooth ses için gerekli
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="PULSE_SERVER=unix:/run/user/1000/pulse/native"
+
 # Uygulama komutu (uv kullanarak)
 ExecStart=/home/efraim/.local/bin/uv run vakit-pi serve
 
