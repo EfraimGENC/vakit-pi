@@ -1,0 +1,43 @@
+[Unit]
+Description=Vakit-Pi - Namaz Vakti ve Ezan Uygulaması
+Documentation=https://github.com/vakit-pi/vakit-pi
+After=network.target sound.target bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi
+
+# Environment variables
+Environment="VAKIT_PI_HOST=0.0.0.0"
+Environment="VAKIT_PI_PORT=8080"
+Environment="VAKIT_PI_LOG_LEVEL=INFO"
+Environment="VAKIT_PI_SETTINGS_PATH=/home/pi/.config/vakit-pi/settings.json"
+
+# Uygulama komutu (uv kullanarak)
+ExecStart=/home/pi/.local/bin/uv run vakit-pi serve
+
+# Alternatif: pip ile kurulduysa
+# ExecStart=/home/pi/.local/bin/vakit-pi serve
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/.config/vakit-pi
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vakit-pi
+
+[Install]
+WantedBy=multi-user.target
