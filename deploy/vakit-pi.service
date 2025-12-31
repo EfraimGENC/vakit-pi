@@ -43,7 +43,7 @@ StartLimitBurst=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/efraim/.config/vakit-pi
+ReadWritePaths=/home/efraim/.config/vakit-pi /home/efraim/.cache/uv
 
 # Logging
 StandardOutput=journal

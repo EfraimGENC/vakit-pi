@@ -152,7 +152,7 @@ StartLimitBurst=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=$CONFIG_DIR
+ReadWritePaths=$CONFIG_DIR $HOME/.cache/uv
 
 # Logging
 StandardOutput=journal
