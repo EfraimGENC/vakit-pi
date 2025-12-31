@@ -167,7 +167,13 @@ class SchedulerService:
         logger.info("Scheduler başlatıldı.")
 
         # Bugünün vakitlerini planla
-        self.schedule_day()
+        scheduled_today = self.schedule_day()
+
+        # Bugün için planlanan iş yoksa (tüm vakitler geçmişse) yarını da planla
+        if scheduled_today == 0:
+            tomorrow = datetime.now(self._prayer_service.timezone) + timedelta(days=1)
+            logger.info("Bugün için planlanan vakit yok, yarın planlanıyor.")
+            self.schedule_day(tomorrow)
 
         # Her gece yarısı ertesi günü planla
         while self._running:
