@@ -17,8 +17,8 @@ Wants=bluetooth.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
+User=efraim
+Group=efraim
 WorkingDirectory=/home/efraim/vakit-pi
 
 # Environment variables
