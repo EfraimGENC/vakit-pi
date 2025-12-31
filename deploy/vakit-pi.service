@@ -42,8 +42,7 @@ StartLimitBurst=3
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/efraim/.config/vakit-pi /home/efraim/.cache/uv
+# ProtectHome devre dışı - uv cache erişimi için gerekli
 
 # Logging
 StandardOutput=journal

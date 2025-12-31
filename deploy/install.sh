@@ -151,8 +151,7 @@ StartLimitBurst=3
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=$CONFIG_DIR $HOME/.cache/uv
+# ProtectHome devre dışı - uv cache erişimi için gerekli
 
 # Logging
 StandardOutput=journal
