@@ -131,6 +131,7 @@ class TestAudioRequest(BaseModel):
     """Ses testi isteği."""
 
     volume: Annotated[int | None, Field(ge=0, le=100)] = None
+    duration: Annotated[int, Field(ge=5, le=120, description="Test süresi (saniye)")] = 10
 
 
 class ApiResponse(BaseModel):

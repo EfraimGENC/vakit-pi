@@ -191,11 +191,23 @@
                                class="w-full accent-emerald-500">
                     </div>
                     
-                    <button @click="testAudio" 
-                            :disabled="testingAudio"
-                            class="w-full bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-xl py-2 text-sm transition">
-                        {{ testingAudio ? '🔊 Test ediliyor...' : '🔈 Ses Testi' }}
-                    </button>
+                    <div class="mb-4">
+                        <label class="text-sm text-gray-400 block mb-2">Test Süresi: {{ testDuration }} saniye</label>
+                        <input type="range" v-model.number="testDuration" min="5" max="60" step="5"
+                               class="w-full accent-emerald-500">
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button @click="testAudio" 
+                                :disabled="testingAudio"
+                                class="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-xl py-2 text-sm transition">
+                            {{ testingAudio ? '🔊 Test ediliyor...' : '🔈 Ses Testi' }}
+                        </button>
+                        <button v-if="testingAudio" @click="stopAudio"
+                                class="bg-red-600 hover:bg-red-500 rounded-xl px-4 py-2 text-sm transition">
+                            ⏹️ Durdur
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Vakit Bazlı Ses Seviyeleri -->
@@ -341,6 +353,7 @@
                 const prayerNames = ref([]);
                 const saving = ref(false);
                 const testingAudio = ref(false);
+                const testDuration = ref(10);
                 const toast = ref({ show: false, message: '', type: 'success' });
 
                 let refreshInterval = null;
@@ -440,11 +453,14 @@
                         const res = await fetch(`${API_BASE}/audio/test`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ volume: settings.value.volume.default })
+                            body: JSON.stringify({ 
+                                volume: settings.value.volume.default,
+                                duration: testDuration.value
+                            })
                         });
                         const data = await res.json();
                         if (data.success) {
-                            showToast('Ses testi başarılı!', 'success');
+                            showToast('Ses testi tamamlandı!', 'success');
                         } else {
                             showToast('Ses testi başarısız!', 'error');
                         }
@@ -452,6 +468,16 @@
                         showToast('Ses testi hatası: ' + e.message, 'error');
                     } finally {
                         testingAudio.value = false;
+                    }
+                };
+
+                const stopAudio = async () => {
+                    try {
+                        await fetch(`${API_BASE}/audio/stop`, { method: 'POST' });
+                        testingAudio.value = false;
+                        showToast('Ses testi durduruldu.', 'success');
+                    } catch (e) {
+                        showToast('Durdurma hatası!', 'error');
                     }
                 };
 
@@ -535,10 +561,12 @@
                     prayerNames,
                     saving,
                     testingAudio,
+                    testDuration,
                     toast,
                     getIcon,
                     saveSettings,
                     testAudio,
+                    stopAudio,
                     stopAdhan,
                     togglePrayer,
                     getVolumeForPrayer,

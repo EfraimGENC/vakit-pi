@@ -328,10 +328,10 @@ async def test_audio(
     request: TestAudioRequest,
     state: Annotated[AppState, Depends(get_app_state)],
 ) -> ApiResponse:
-    """Ses testi yap."""
-    success = await state.adhan_service.test_audio(request.volume)
+    """Ses testi yap. Test sırasında /audio/stop ile durdurulabilir."""
+    success = await state.adhan_service.test_audio(request.volume, request.duration)
     if success:
-        return ApiResponse(success=True, message="Ses testi başarılı.")
+        return ApiResponse(success=True, message="Ses testi tamamlandı.")
     else:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
