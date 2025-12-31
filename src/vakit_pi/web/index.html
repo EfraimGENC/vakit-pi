@@ -1,579 +1,706 @@
 <!DOCTYPE html>
 <html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vakit-Pi - Namaz Vakitleri</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        .amiri { font-family: 'Amiri', serif; }
-        .gradient-bg {
-            background: linear-gradient(135deg, #1e3a5f 0%, #0d1b2a 50%, #1b263b 100%);
+      .amiri {
+        font-family: "Amiri", serif;
+      }
+      .gradient-bg {
+        background: linear-gradient(
+          135deg,
+          #1e3a5f 0%,
+          #0d1b2a 50%,
+          #1b263b 100%
+        );
+      }
+      .glass {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .active-prayer {
+        animation: pulse-glow 2s ease-in-out infinite;
+      }
+      @keyframes pulse-glow {
+        0%,
+        100% {
+          box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
         }
-        .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        50% {
+          box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
         }
-        .active-prayer {
-            animation: pulse-glow 2s ease-in-out infinite;
+      }
+      .switch {
+        position: relative;
+        width: 48px;
+        height: 26px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: #374151;
+        transition: 0.3s;
+        border-radius: 26px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+      }
+      input:checked + .slider {
+        background-color: #22c55e;
+      }
+      input:checked + .slider:before {
+        transform: translateX(22px);
+      }
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #22c55e;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
-            50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.6); }
-        }
-        .switch {
-            position: relative;
-            width: 48px;
-            height: 26px;
-        }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            inset: 0;
-            background-color: #374151;
-            transition: .3s;
-            border-radius: 26px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: #22c55e;
-        }
-        input:checked + .slider:before {
-            transform: translateX(22px);
-        }
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #22c55e;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+      }
     </style>
-</head>
-<body class="gradient-bg min-h-screen text-white">
+  </head>
+  <body class="gradient-bg min-h-screen text-white">
     <div id="app">
-        <!-- Loading State -->
-        <div v-if="loading" class="loading">
-            <div class="spinner"></div>
+      <!-- Loading State -->
+      <div v-if="loading" class="loading">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Main Content -->
+      <div v-else class="min-h-screen pb-20 w-full max-w-xl mx-auto mb-10">
+        <!-- Header -->
+        <div class="text-center pt-8 pb-4 px-4">
+          <p class="text-emerald-400 text-sm">
+            {{ currentState?.location?.city || 'Konum yükleniyor...' }}
+          </p>
+          <h1 class="amiri text-5xl font-bold mt-2">
+            {{ currentState?.current_time || '--:--:--' }}
+          </h1>
+          <p class="text-gray-400 mt-1">
+            {{ currentState?.current_date || '' }}
+          </p>
+          <p class="text-amber-400 text-sm amiri mt-1">
+            {{ currentState?.hijri_date || '' }}
+          </p>
         </div>
 
-        <!-- Main Content -->
-        <div v-else class="min-h-screen pb-30 w-full max-w-xl mx-auto">
-            <!-- Header -->
-            <div class="text-center pt-8 pb-4 px-4">
-                <p class="text-emerald-400 text-sm">{{ currentState?.location?.city || 'Konum yükleniyor...' }}</p>
-                <h1 class="amiri text-5xl font-bold mt-2">{{ currentState?.current_time || '--:--:--' }}</h1>
-                <p class="text-gray-400 mt-1">{{ currentState?.current_date || '' }}</p>
-                <p class="text-amber-400 text-sm amiri mt-1">{{ currentState?.hijri_date || '' }}</p>
+        <!-- Ana Sayfa -->
+        <div v-if="currentTab === 'home'" class="px-4">
+          <!-- Sonraki Namaz Kartı -->
+          <div class="glass rounded-2xl p-6 mb-6 text-center">
+            <p class="text-gray-400 text-sm">Sonraki Namaz</p>
+            <div class="flex items-center justify-center gap-3 mt-2">
+              <span class="text-3xl"
+                >{{ getIcon(currentState?.next_prayer) }}</span
+              >
+              <span class="text-2xl font-semibold"
+                >{{ currentState?.next_prayer_display || '-' }}</span
+              >
+            </div>
+            <p class="text-4xl font-bold text-emerald-400 mt-2">
+              {{ currentState?.next_prayer_time || '--:--' }}
+            </p>
+            <div class="mt-4 bg-black/30 rounded-xl py-3 px-4">
+              <p class="text-gray-400 text-xs">Kalan Süre</p>
+              <p class="text-2xl font-mono text-white">
+                {{ currentState?.countdown || '--:--:--' }}
+              </p>
             </div>
 
-            <!-- Ana Sayfa -->
-            <div v-if="currentTab === 'home'" class="px-4">
-                <!-- Sonraki Namaz Kartı -->
-                <div class="glass rounded-2xl p-6 mb-6 text-center">
-                    <p class="text-gray-400 text-sm">Sonraki Namaz</p>
-                    <div class="flex items-center justify-center gap-3 mt-2">
-                        <span class="text-3xl">{{ getIcon(currentState?.next_prayer) }}</span>
-                        <span class="text-2xl font-semibold">{{ currentState?.next_prayer_display || '-' }}</span>
-                    </div>
-                    <p class="text-4xl font-bold text-emerald-400 mt-2">{{ currentState?.next_prayer_time || '--:--' }}</p>
-                    <div class="mt-4 bg-black/30 rounded-xl py-3 px-4">
-                        <p class="text-gray-400 text-xs">Kalan Süre</p>
-                        <p class="text-2xl font-mono text-white">{{ currentState?.countdown || '--:--:--' }}</p>
-                    </div>
-                    
-                    <!-- Ezan Çalıyor Bildirimi -->
-                    <div v-if="currentState?.is_adhan_playing" class="mt-4 bg-emerald-500/20 rounded-xl py-3 px-4 flex items-center justify-center gap-2">
-                        <span class="text-2xl">🔊</span>
-                        <span class="text-emerald-400 font-medium">Ezan Okunuyor</span>
-                        <button @click="stopAdhan" class="ml-4 bg-red-500/50 hover:bg-red-500 px-3 py-1 rounded-lg text-sm">
-                            Durdur
-                        </button>
-                    </div>
-                </div>
+            <!-- Ezan Çalıyor Bildirimi -->
+            <div
+              v-if="currentState?.is_adhan_playing"
+              class="mt-4 bg-emerald-500/20 rounded-xl py-3 px-4 flex items-center justify-center gap-2"
+            >
+              <span class="text-2xl">🔊</span>
+              <span class="text-emerald-400 font-medium">Ezan Okunuyor</span>
+              <button
+                @click="stopAdhan"
+                class="ml-4 bg-red-500/50 hover:bg-red-500 px-3 py-1 rounded-lg text-sm"
+              >
+                Durdur
+              </button>
+            </div>
+          </div>
 
-                <!-- Namaz Vakitleri Listesi -->
-                <div class="glass rounded-2xl overflow-hidden">
-                    <div v-for="prayer in todayTimes?.prayers" :key="prayer.name"
-                         :class="[
+          <!-- Namaz Vakitleri Listesi -->
+          <div class="glass rounded-2xl overflow-hidden">
+            <div
+              v-for="prayer in todayTimes?.prayers"
+              :key="prayer.name"
+              :class="[
                              'flex items-center justify-between p-4 border-b border-white/5 last:border-0',
                              currentState?.current_prayer === prayer.name ? 'active-prayer bg-emerald-500/10' : ''
-                         ]">
-                        <div class="flex items-center gap-3">
-                            <span class="text-2xl">{{ prayer.icon }}</span>
-                            <div>
-                                <p class="font-medium">{{ prayer.display_name }}</p>
-                                <p v-if="prayer.enabled" class="text-xs text-emerald-400">🔔 Sesli</p>
-                                <p v-else class="text-xs text-gray-500">🔕 Sessiz</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xl font-semibold">{{ prayer.time }}</p>
-                            <p v-if="currentState?.current_prayer === prayer.name" class="text-xs text-emerald-400">Şu anki vakit</p>
-                        </div>
-                    </div>
+                         ]"
+            >
+              <div class="flex items-center gap-3">
+                <span class="text-2xl">{{ prayer.icon }}</span>
+                <div>
+                  <p class="font-medium">{{ prayer.display_name }}</p>
+                  <p v-if="prayer.enabled" class="text-xs text-emerald-400">
+                    🔔 Sesli
+                  </p>
+                  <p v-else class="text-xs text-gray-500">🔕 Sessiz</p>
                 </div>
+              </div>
+              <div class="text-right">
+                <p class="text-xl font-semibold">{{ prayer.time }}</p>
+                <p
+                  v-if="currentState?.current_prayer === prayer.name"
+                  class="text-xs text-emerald-400"
+                >
+                  Şu anki vakit
+                </p>
+              </div>
             </div>
-
-            <!-- Ayarlar -->
-            <div v-if="currentTab === 'settings'" class="px-4">
-                <h2 class="text-xl font-semibold mb-4">⚙️ Ayarlar</h2>
-
-                <!-- Konum Ayarları -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <h3 class="font-medium text-emerald-400 mb-3">📍 Konum</h3>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="text-sm text-gray-400 block mb-1">Enlem</label>
-                            <input type="number" step="0.0001" v-model.number="settings.location.latitude"
-                                   class="w-full bg-white/10 rounded-xl py-2 px-3 border border-white/10 focus:border-emerald-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="text-sm text-gray-400 block mb-1">Boylam</label>
-                            <input type="number" step="0.0001" v-model.number="settings.location.longitude"
-                                   class="w-full bg-white/10 rounded-xl py-2 px-3 border border-white/10 focus:border-emerald-500 outline-none">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="text-sm text-gray-400 block mb-1">Şehir</label>
-                        <input type="text" v-model="settings.location.city"
-                               class="w-full bg-white/10 rounded-xl py-2 px-3 border border-white/10 focus:border-emerald-500 outline-none">
-                    </div>
-                </div>
-
-                <!-- Ezan Ayarları -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <h3 class="font-medium text-emerald-400 mb-3">🔊 Ezan Ayarları</h3>
-                    
-                    <div class="mb-4">
-                        <label class="text-sm text-gray-400 block mb-2">Ezan Türü</label>
-                        <select v-model="settings.adhan_type" 
-                                class="w-full bg-white/10 rounded-xl py-3 px-4 border border-white/10 focus:border-emerald-500 outline-none">
-                            <option v-for="type in adhanTypes" :key="type.value" :value="type.value">
-                                {{ type.label }}
-                            </option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="text-sm text-gray-400 block mb-2">Genel Ses Seviyesi: {{ settings.volume.default }}%</label>
-                        <input type="range" v-model.number="settings.volume.default" min="0" max="100" 
-                               class="w-full accent-emerald-500">
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="text-sm text-gray-400 block mb-2">Test Süresi: {{ testDuration }} saniye</label>
-                        <input type="range" v-model.number="testDuration" min="5" max="60" step="5"
-                               class="w-full accent-emerald-500">
-                    </div>
-                    
-                    <div class="flex gap-2">
-                        <button @click="testAudio" 
-                                :disabled="testingAudio"
-                                class="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-xl py-2 text-sm transition">
-                            {{ testingAudio ? '🔊 Test ediliyor...' : '🔈 Ses Testi' }}
-                        </button>
-                        <button v-if="testingAudio" @click="stopAudio"
-                                class="bg-red-600 hover:bg-red-500 rounded-xl px-4 py-2 text-sm transition">
-                            ⏹️ Durdur
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Vakit Bazlı Ses Seviyeleri -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <h3 class="font-medium text-emerald-400 mb-3">🎚️ Vakit Bazlı Ses Seviyeleri</h3>
-                    <p class="text-xs text-gray-400 mb-4">Boş bırakılırsa genel ses seviyesi kullanılır.</p>
-                    
-                    <div v-for="prayer in prayerNames" :key="prayer.value" class="mb-3">
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-sm">{{ prayer.icon }} {{ prayer.display_name }}</span>
-                            <span class="text-xs text-gray-400">
-                                {{ getVolumeForPrayer(prayer.value) ?? 'Varsayılan' }}{{ getVolumeForPrayer(prayer.value) !== null ? '%' : '' }}
-                            </span>
-                        </div>
-                        <input type="range" 
-                               :value="getVolumeForPrayer(prayer.value) ?? settings.volume.default" 
-                               @input="setVolumeForPrayer(prayer.value, $event.target.value)"
-                               min="0" max="100" 
-                               class="w-full accent-emerald-500">
-                    </div>
-                </div>
-
-                <!-- Vakit Bildirimleri -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <h3 class="font-medium text-emerald-400 mb-3">🔔 Ezan Okunacak Vakitler</h3>
-                    
-                    <div v-for="prayer in prayerNames" :key="prayer.value"
-                         class="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-                        <div class="flex items-center gap-2">
-                            <span>{{ prayer.icon }}</span>
-                            <span>{{ prayer.display_name }}</span>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" 
-                                   :checked="settings.enabled_prayers.includes(prayer.value)"
-                                   @change="togglePrayer(prayer.value)">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Ön Uyarı -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <h3 class="font-medium text-emerald-400 mb-3">⏰ Ön Uyarı</h3>
-                    
-                    <div class="mb-2">
-                        <label class="text-sm text-gray-400 block mb-2">
-                            Vakitten {{ settings.pre_alert_minutes }} dakika önce uyar
-                        </label>
-                        <input type="range" v-model.number="settings.pre_alert_minutes" min="0" max="30" step="5"
-                               class="w-full accent-emerald-500">
-                    </div>
-                    <div class="flex justify-between text-xs text-gray-500">
-                        <span>Kapalı</span>
-                        <span>15 dk</span>
-                        <span>30 dk</span>
-                    </div>
-                </div>
-
-                <!-- Hesaplama Yöntemi -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <h3 class="font-medium text-emerald-400 mb-3">📐 Hesaplama Ayarları</h3>
-                    
-                    <div class="mb-4">
-                        <label class="text-sm text-gray-400 block mb-2">İkindi Hesaplama (Mezhep)</label>
-                        <select v-model.number="settings.asr_fiqh" 
-                                class="w-full bg-white/10 rounded-xl py-3 px-4 border border-white/10 focus:border-emerald-500 outline-none">
-                            <option :value="1">Hanefi</option>
-                            <option :value="0">Şafi</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Kaydet Butonu -->
-                <button @click="saveSettings" 
-                        :disabled="saving"
-                        class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl py-4 font-semibold text-lg transition mb-4">
-                    {{ saving ? 'Kaydediliyor...' : '💾 Ayarları Kaydet' }}
-                </button>
-
-                <!-- Sistem Durumu -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <h3 class="font-medium text-emerald-400 mb-3">🖥️ Sistem</h3>
-                    <div class="text-sm text-gray-400 space-y-2">
-                        <p>Sürüm: {{ systemStatus?.version || '-' }}</p>
-                        <p>Çalışma Süresi: {{ systemStatus?.uptime || '-' }}</p>
-                        <p>Ses Oynatıcı: {{ systemStatus?.audio_player || '-' }}</p>
-                        <p>Planlanmış İşler: {{ systemStatus?.scheduled_jobs_count || 0 }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bottom Navigation -->
-            <nav class="fixed bottom-0 left-0 right-0 glass border-t border-white/10">
-                <div class="flex justify-around py-3">
-                    <button @click="currentTab = 'home'" 
-                            :class="['flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition',
-                                     currentTab === 'home' ? 'text-emerald-400' : 'text-gray-400']">
-                        <span class="text-xl">🕌</span>
-                        <span class="text-xs">Vakitler</span>
-                    </button>
-                    <button @click="currentTab = 'settings'" 
-                            :class="['flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition',
-                                     currentTab === 'settings' ? 'text-emerald-400' : 'text-gray-400']">
-                        <span class="text-xl">⚙️</span>
-                        <span class="text-xs">Ayarlar</span>
-                    </button>
-                </div>
-            </nav>
+          </div>
         </div>
 
-        <!-- Toast Notification -->
-        <div v-if="toast.show" 
-             :class="['fixed top-4 right-4 px-4 py-3 rounded-xl shadow-lg transition-all duration-300',
-                      toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600']">
-            {{ toast.message }}
+        <!-- Ayarlar -->
+        <div v-if="currentTab === 'settings'" class="px-4">
+          <h2 class="text-xl font-semibold mb-4">⚙️ Ayarlar</h2>
+
+          <!-- Konum Ayarları -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <h3 class="font-medium text-emerald-400 mb-3">📍 Konum</h3>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Enlem</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  v-model.number="settings.location.latitude"
+                  class="w-full bg-white/10 rounded-xl py-2 px-3 border border-white/10 focus:border-emerald-500 outline-none"
+                />
+              </div>
+              <div>
+                <label class="text-sm text-gray-400 block mb-1">Boylam</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  v-model.number="settings.location.longitude"
+                  class="w-full bg-white/10 rounded-xl py-2 px-3 border border-white/10 focus:border-emerald-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="text-sm text-gray-400 block mb-1">Şehir</label>
+              <input
+                type="text"
+                v-model="settings.location.city"
+                class="w-full bg-white/10 rounded-xl py-2 px-3 border border-white/10 focus:border-emerald-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <!-- Ezan Ayarları -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <h3 class="font-medium text-emerald-400 mb-3">🔊 Ezan Ayarları</h3>
+
+            <div class="mb-4">
+              <label class="text-sm text-gray-400 block mb-2">Ezan Türü</label>
+              <select
+                v-model="settings.adhan_type"
+                class="w-full bg-white/10 rounded-xl py-3 px-4 border border-white/10 focus:border-emerald-500 outline-none"
+              >
+                <option
+                  v-for="type in adhanTypes"
+                  :key="type.value"
+                  :value="type.value"
+                >
+                  {{ type.label }}
+                </option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label class="text-sm text-gray-400 block mb-2"
+                >Genel Ses Seviyesi: {{ settings.volume.default }}%</label
+              >
+              <input
+                type="range"
+                v-model.number="settings.volume.default"
+                min="0"
+                max="100"
+                class="w-full accent-emerald-500"
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="text-sm text-gray-400 block mb-2"
+                >Test Süresi: {{ testDuration }} saniye</label
+              >
+              <input
+                type="range"
+                v-model.number="testDuration"
+                min="5"
+                max="60"
+                step="5"
+                class="w-full accent-emerald-500"
+              />
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                @click="testAudio"
+                :disabled="testingAudio"
+                class="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-xl py-2 text-sm transition"
+              >
+                {{ testingAudio ? '🔊 Test ediliyor...' : '🔈 Ses Testi' }}
+              </button>
+              <button
+                v-if="testingAudio"
+                @click="stopAudio"
+                class="bg-red-600 hover:bg-red-500 rounded-xl px-4 py-2 text-sm transition"
+              >
+                ⏹️ Durdur
+              </button>
+            </div>
+          </div>
+
+          <!-- Vakit Bazlı Ses Seviyeleri -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <h3 class="font-medium text-emerald-400 mb-3">
+              🎚️ Vakit Bazlı Ses Seviyeleri
+            </h3>
+            <p class="text-xs text-gray-400 mb-4">
+              Boş bırakılırsa genel ses seviyesi kullanılır.
+            </p>
+
+            <div v-for="prayer in prayerNames" :key="prayer.value" class="mb-3">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm"
+                  >{{ prayer.icon }} {{ prayer.display_name }}</span
+                >
+                <span class="text-xs text-gray-400">
+                  {{ getVolumeForPrayer(prayer.value) ?? 'Varsayılan' }}{{
+                  getVolumeForPrayer(prayer.value) !== null ? '%' : '' }}
+                </span>
+              </div>
+              <input
+                type="range"
+                :value="getVolumeForPrayer(prayer.value) ?? settings.volume.default"
+                @input="setVolumeForPrayer(prayer.value, $event.target.value)"
+                min="0"
+                max="100"
+                class="w-full accent-emerald-500"
+              />
+            </div>
+          </div>
+
+          <!-- Vakit Bildirimleri -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <h3 class="font-medium text-emerald-400 mb-3">
+              🔔 Ezan Okunacak Vakitler
+            </h3>
+
+            <div
+              v-for="prayer in prayerNames"
+              :key="prayer.value"
+              class="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
+            >
+              <div class="flex items-center gap-2">
+                <span>{{ prayer.icon }}</span>
+                <span>{{ prayer.display_name }}</span>
+              </div>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  :checked="settings.enabled_prayers.includes(prayer.value)"
+                  @change="togglePrayer(prayer.value)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Ön Uyarı -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <h3 class="font-medium text-emerald-400 mb-3">⏰ Ön Uyarı</h3>
+
+            <div class="mb-2">
+              <label class="text-sm text-gray-400 block mb-2">
+                Vakitten {{ settings.pre_alert_minutes }} dakika önce uyar
+              </label>
+              <input
+                type="range"
+                v-model.number="settings.pre_alert_minutes"
+                min="0"
+                max="30"
+                step="5"
+                class="w-full accent-emerald-500"
+              />
+            </div>
+            <div class="flex justify-between text-xs text-gray-500">
+              <span>Kapalı</span>
+              <span>15 dk</span>
+              <span>30 dk</span>
+            </div>
+          </div>
+
+          <!-- Hesaplama Yöntemi -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <h3 class="font-medium text-emerald-400 mb-3">
+              📐 Hesaplama Ayarları
+            </h3>
+
+            <div class="mb-4">
+              <label class="text-sm text-gray-400 block mb-2"
+                >İkindi Hesaplama (Mezhep)</label
+              >
+              <select
+                v-model.number="settings.asr_fiqh"
+                class="w-full bg-white/10 rounded-xl py-3 px-4 border border-white/10 focus:border-emerald-500 outline-none"
+              >
+                <option :value="1">Hanefi</option>
+                <option :value="0">Şafi</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Kaydet Butonu -->
+          <button
+            @click="saveSettings"
+            :disabled="saving"
+            class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl py-4 font-semibold text-lg transition mb-4"
+          >
+            {{ saving ? 'Kaydediliyor...' : '💾 Ayarları Kaydet' }}
+          </button>
+
+          <!-- Sistem Durumu -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <h3 class="font-medium text-emerald-400 mb-3">🖥️ Sistem</h3>
+            <div class="text-sm text-gray-400 space-y-2">
+              <p>Sürüm: {{ systemStatus?.version || '-' }}</p>
+              <p>Çalışma Süresi: {{ systemStatus?.uptime || '-' }}</p>
+              <p>Ses Oynatıcı: {{ systemStatus?.audio_player || '-' }}</p>
+              <p>
+                Planlanmış İşler: {{ systemStatus?.scheduled_jobs_count || 0 }}
+              </p>
+            </div>
+          </div>
         </div>
+
+        <!-- Bottom Navigation -->
+        <nav
+          class="fixed bottom-0 left-0 right-0 glass border-t border-white/10"
+        >
+          <div class="flex justify-around py-3">
+            <button
+              @click="currentTab = 'home'"
+              :class="['flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition',
+                                     currentTab === 'home' ? 'text-emerald-400' : 'text-gray-400']"
+            >
+              <span class="text-xl">🕌</span>
+              <span class="text-xs">Vakitler</span>
+            </button>
+            <button
+              @click="currentTab = 'settings'"
+              :class="['flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition',
+                                     currentTab === 'settings' ? 'text-emerald-400' : 'text-gray-400']"
+            >
+              <span class="text-xl">⚙️</span>
+              <span class="text-xs">Ayarlar</span>
+            </button>
+          </div>
+        </nav>
+      </div>
+
+      <!-- Toast Notification -->
+      <div
+        v-if="toast.show"
+        :class="['fixed top-4 right-4 px-4 py-3 rounded-xl shadow-lg transition-all duration-300',
+                      toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600']"
+      >
+        {{ toast.message }}
+      </div>
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+      const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
 
-        const API_BASE = '/api';
+      const API_BASE = "/api";
 
-        createApp({
-            setup() {
-                // State
-                const loading = ref(true);
-                const currentTab = ref('home');
-                const currentState = ref(null);
-                const todayTimes = ref(null);
-                const settings = ref({
-                    location: { latitude: 41.0, longitude: 29.0, city: '' },
-                    adhan_type: 'istanbul',
-                    offsets: {},
-                    volume: { default: 80 },
-                    enabled_prayers: [],
-                    pre_alert_minutes: 0,
-                    asr_fiqh: 1
-                });
-                const systemStatus = ref(null);
-                const adhanTypes = ref([]);
-                const prayerNames = ref([]);
-                const saving = ref(false);
-                const testingAudio = ref(false);
-                const testDuration = ref(10);
-                const toast = ref({ show: false, message: '', type: 'success' });
+      createApp({
+        setup() {
+          // State
+          const loading = ref(true);
+          const currentTab = ref("home");
+          const currentState = ref(null);
+          const todayTimes = ref(null);
+          const settings = ref({
+            location: { latitude: 41.0, longitude: 29.0, city: "" },
+            adhan_type: "istanbul",
+            offsets: {},
+            volume: { default: 80 },
+            enabled_prayers: [],
+            pre_alert_minutes: 0,
+            asr_fiqh: 1,
+          });
+          const systemStatus = ref(null);
+          const adhanTypes = ref([]);
+          const prayerNames = ref([]);
+          const saving = ref(false);
+          const testingAudio = ref(false);
+          const testDuration = ref(10);
+          const toast = ref({ show: false, message: "", type: "success" });
 
-                let refreshInterval = null;
+          let refreshInterval = null;
 
-                // Icons mapping
-                const icons = {
-                    imsak: '🌙',
-                    gunes: '🌅',
-                    ogle: '☀️',
-                    ikindi: '🌤️',
-                    aksam: '🌇',
-                    yatsi: '🌃'
-                };
+          // Icons mapping
+          const icons = {
+            imsak: "🌙",
+            gunes: "🌅",
+            ogle: "☀️",
+            ikindi: "🌤️",
+            aksam: "🌇",
+            yatsi: "🌃",
+          };
 
-                const getIcon = (prayer) => icons[prayer] || '🕌';
+          const getIcon = (prayer) => icons[prayer] || "🕌";
 
-                // API calls
-                const fetchCurrentState = async () => {
-                    try {
-                        const res = await fetch(`${API_BASE}/current`);
-                        currentState.value = await res.json();
-                    } catch (e) {
-                        console.error('Durum alınamadı:', e);
-                    }
-                };
-
-                const fetchTodayTimes = async () => {
-                    try {
-                        const res = await fetch(`${API_BASE}/times/today`);
-                        todayTimes.value = await res.json();
-                    } catch (e) {
-                        console.error('Vakitler alınamadı:', e);
-                    }
-                };
-
-                const fetchSettings = async () => {
-                    try {
-                        const res = await fetch(`${API_BASE}/settings`);
-                        settings.value = await res.json();
-                    } catch (e) {
-                        console.error('Ayarlar alınamadı:', e);
-                    }
-                };
-
-                const fetchSystemStatus = async () => {
-                    try {
-                        const res = await fetch(`${API_BASE}/status`);
-                        systemStatus.value = await res.json();
-                    } catch (e) {
-                        console.error('Sistem durumu alınamadı:', e);
-                    }
-                };
-
-                const fetchAdhanTypes = async () => {
-                    try {
-                        const res = await fetch(`${API_BASE}/audio/adhan-types`);
-                        adhanTypes.value = await res.json();
-                    } catch (e) {
-                        console.error('Ezan türleri alınamadı:', e);
-                    }
-                };
-
-                const fetchPrayerNames = async () => {
-                    try {
-                        const res = await fetch(`${API_BASE}/prayers`);
-                        prayerNames.value = await res.json();
-                    } catch (e) {
-                        console.error('Vakit isimleri alınamadı:', e);
-                    }
-                };
-
-                const saveSettings = async () => {
-                    saving.value = true;
-                    try {
-                        const res = await fetch(`${API_BASE}/settings`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(settings.value)
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            showToast('Ayarlar kaydedildi!', 'success');
-                            await fetchTodayTimes();
-                        } else {
-                            showToast('Kaydetme başarısız!', 'error');
-                        }
-                    } catch (e) {
-                        showToast('Hata: ' + e.message, 'error');
-                    } finally {
-                        saving.value = false;
-                    }
-                };
-
-                const testAudio = async () => {
-                    testingAudio.value = true;
-                    try {
-                        const res = await fetch(`${API_BASE}/audio/test`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                volume: settings.value.volume.default,
-                                duration: testDuration.value
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            showToast('Ses testi tamamlandı!', 'success');
-                        } else {
-                            showToast('Ses testi başarısız!', 'error');
-                        }
-                    } catch (e) {
-                        showToast('Ses testi hatası: ' + e.message, 'error');
-                    } finally {
-                        testingAudio.value = false;
-                    }
-                };
-
-                const stopAudio = async () => {
-                    try {
-                        await fetch(`${API_BASE}/audio/stop`, { method: 'POST' });
-                        testingAudio.value = false;
-                        showToast('Ses testi durduruldu.', 'success');
-                    } catch (e) {
-                        showToast('Durdurma hatası!', 'error');
-                    }
-                };
-
-                const stopAdhan = async () => {
-                    try {
-                        await fetch(`${API_BASE}/audio/stop`, { method: 'POST' });
-                        showToast('Ezan durduruldu.', 'success');
-                    } catch (e) {
-                        showToast('Durdurma hatası!', 'error');
-                    }
-                };
-
-                const togglePrayer = (prayer) => {
-                    const idx = settings.value.enabled_prayers.indexOf(prayer);
-                    if (idx >= 0) {
-                        settings.value.enabled_prayers.splice(idx, 1);
-                    } else {
-                        settings.value.enabled_prayers.push(prayer);
-                    }
-                };
-
-                const getVolumeForPrayer = (prayer) => {
-                    const key = prayerToVolumeKey(prayer);
-                    return settings.value.volume[key];
-                };
-
-                const setVolumeForPrayer = (prayer, value) => {
-                    const key = prayerToVolumeKey(prayer);
-                    settings.value.volume[key] = parseInt(value);
-                };
-
-                const prayerToVolumeKey = (prayer) => {
-                    const mapping = {
-                        'imsak': 'fajr',
-                        'gunes': 'sunrise',
-                        'ogle': 'dhuhr',
-                        'ikindi': 'asr',
-                        'aksam': 'maghrib',
-                        'yatsi': 'isha'
-                    };
-                    return mapping[prayer] || prayer;
-                };
-
-                const showToast = (message, type = 'success') => {
-                    toast.value = { show: true, message, type };
-                    setTimeout(() => {
-                        toast.value.show = false;
-                    }, 3000);
-                };
-
-                // Initialize
-                onMounted(async () => {
-                    await Promise.all([
-                        fetchCurrentState(),
-                        fetchTodayTimes(),
-                        fetchSettings(),
-                        fetchSystemStatus(),
-                        fetchAdhanTypes(),
-                        fetchPrayerNames()
-                    ]);
-                    loading.value = false;
-
-                    // Her saniye güncel durumu al
-                    refreshInterval = setInterval(fetchCurrentState, 1000);
-                });
-
-                onUnmounted(() => {
-                    if (refreshInterval) {
-                        clearInterval(refreshInterval);
-                    }
-                });
-
-                return {
-                    loading,
-                    currentTab,
-                    currentState,
-                    todayTimes,
-                    settings,
-                    systemStatus,
-                    adhanTypes,
-                    prayerNames,
-                    saving,
-                    testingAudio,
-                    testDuration,
-                    toast,
-                    getIcon,
-                    saveSettings,
-                    testAudio,
-                    stopAudio,
-                    stopAdhan,
-                    togglePrayer,
-                    getVolumeForPrayer,
-                    setVolumeForPrayer
-                };
+          // API calls
+          const fetchCurrentState = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/current`);
+              currentState.value = await res.json();
+            } catch (e) {
+              console.error("Durum alınamadı:", e);
             }
-        }).mount('#app');
+          };
+
+          const fetchTodayTimes = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/times/today`);
+              todayTimes.value = await res.json();
+            } catch (e) {
+              console.error("Vakitler alınamadı:", e);
+            }
+          };
+
+          const fetchSettings = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/settings`);
+              settings.value = await res.json();
+            } catch (e) {
+              console.error("Ayarlar alınamadı:", e);
+            }
+          };
+
+          const fetchSystemStatus = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/status`);
+              systemStatus.value = await res.json();
+            } catch (e) {
+              console.error("Sistem durumu alınamadı:", e);
+            }
+          };
+
+          const fetchAdhanTypes = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/audio/adhan-types`);
+              adhanTypes.value = await res.json();
+            } catch (e) {
+              console.error("Ezan türleri alınamadı:", e);
+            }
+          };
+
+          const fetchPrayerNames = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/prayers`);
+              prayerNames.value = await res.json();
+            } catch (e) {
+              console.error("Vakit isimleri alınamadı:", e);
+            }
+          };
+
+          const saveSettings = async () => {
+            saving.value = true;
+            try {
+              const res = await fetch(`${API_BASE}/settings`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(settings.value),
+              });
+              const data = await res.json();
+              if (data.success) {
+                showToast("Ayarlar kaydedildi!", "success");
+                await fetchTodayTimes();
+              } else {
+                showToast("Kaydetme başarısız!", "error");
+              }
+            } catch (e) {
+              showToast("Hata: " + e.message, "error");
+            } finally {
+              saving.value = false;
+            }
+          };
+
+          const testAudio = async () => {
+            testingAudio.value = true;
+            try {
+              const res = await fetch(`${API_BASE}/audio/test`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  volume: settings.value.volume.default,
+                  duration: testDuration.value,
+                }),
+              });
+              const data = await res.json();
+              if (data.success) {
+                showToast("Ses testi tamamlandı!", "success");
+              } else {
+                showToast("Ses testi başarısız!", "error");
+              }
+            } catch (e) {
+              showToast("Ses testi hatası: " + e.message, "error");
+            } finally {
+              testingAudio.value = false;
+            }
+          };
+
+          const stopAudio = async () => {
+            try {
+              await fetch(`${API_BASE}/audio/stop`, { method: "POST" });
+              testingAudio.value = false;
+              showToast("Ses testi durduruldu.", "success");
+            } catch (e) {
+              showToast("Durdurma hatası!", "error");
+            }
+          };
+
+          const stopAdhan = async () => {
+            try {
+              await fetch(`${API_BASE}/audio/stop`, { method: "POST" });
+              showToast("Ezan durduruldu.", "success");
+            } catch (e) {
+              showToast("Durdurma hatası!", "error");
+            }
+          };
+
+          const togglePrayer = (prayer) => {
+            const idx = settings.value.enabled_prayers.indexOf(prayer);
+            if (idx >= 0) {
+              settings.value.enabled_prayers.splice(idx, 1);
+            } else {
+              settings.value.enabled_prayers.push(prayer);
+            }
+          };
+
+          const getVolumeForPrayer = (prayer) => {
+            const key = prayerToVolumeKey(prayer);
+            return settings.value.volume[key];
+          };
+
+          const setVolumeForPrayer = (prayer, value) => {
+            const key = prayerToVolumeKey(prayer);
+            settings.value.volume[key] = parseInt(value);
+          };
+
+          const prayerToVolumeKey = (prayer) => {
+            const mapping = {
+              imsak: "fajr",
+              gunes: "sunrise",
+              ogle: "dhuhr",
+              ikindi: "asr",
+              aksam: "maghrib",
+              yatsi: "isha",
+            };
+            return mapping[prayer] || prayer;
+          };
+
+          const showToast = (message, type = "success") => {
+            toast.value = { show: true, message, type };
+            setTimeout(() => {
+              toast.value.show = false;
+            }, 3000);
+          };
+
+          // Initialize
+          onMounted(async () => {
+            await Promise.all([
+              fetchCurrentState(),
+              fetchTodayTimes(),
+              fetchSettings(),
+              fetchSystemStatus(),
+              fetchAdhanTypes(),
+              fetchPrayerNames(),
+            ]);
+            loading.value = false;
+
+            // Her saniye güncel durumu al
+            refreshInterval = setInterval(fetchCurrentState, 1000);
+          });
+
+          onUnmounted(() => {
+            if (refreshInterval) {
+              clearInterval(refreshInterval);
+            }
+          });
+
+          return {
+            loading,
+            currentTab,
+            currentState,
+            todayTimes,
+            settings,
+            systemStatus,
+            adhanTypes,
+            prayerNames,
+            saving,
+            testingAudio,
+            testDuration,
+            toast,
+            getIcon,
+            saveSettings,
+            testAudio,
+            stopAudio,
+            stopAdhan,
+            togglePrayer,
+            getVolumeForPrayer,
+            setVolumeForPrayer,
+          };
+        },
+      }).mount("#app");
     </script>
-</body>
+  </body>
 </html>
