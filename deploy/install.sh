@@ -69,21 +69,18 @@ else
     log_success "uv zaten kurulu."
 fi
 
-# 4. Proje dizini oluştur
-PROJECT_DIR="/home/pi/vakit-pi"
-log_info "Proje dizini hazırlanıyor: $PROJECT_DIR"
+# 4. Proje dizini belirle (script'in bulunduğu dizinin parent'ı)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+log_info "Proje dizini: $PROJECT_DIR"
 
-if [[ -d "$PROJECT_DIR" ]]; then
-    log_warn "Proje dizini zaten var. Güncelleniyor..."
-    cd "$PROJECT_DIR"
+# Proje dizinine geç
+cd "$PROJECT_DIR"
+
+# Git güncellemesi (opsiyonel)
+if [[ -d ".git" ]]; then
+    log_info "Git güncellemesi kontrol ediliyor..."
     git pull || log_warn "Git pull başarısız, devam ediliyor..."
-else
-    log_info "Proje klonlanıyor..."
-    git clone https://github.com/vakit-pi/vakit-pi.git "$PROJECT_DIR" || {
-        log_warn "Git clone başarısız, manuel kurulum gerekebilir."
-        mkdir -p "$PROJECT_DIR"
-    }
-    cd "$PROJECT_DIR"
 fi
 
 # 5. Bağımlılıkları kur
@@ -91,7 +88,7 @@ log_info "Python bağımlılıkları kuruluyor..."
 uv sync
 
 # 6. Ayar dizinini oluştur
-CONFIG_DIR="/home/pi/.config/vakit-pi"
+CONFIG_DIR="$HOME/.config/vakit-pi"
 log_info "Ayar dizini oluşturuluyor: $CONFIG_DIR"
 mkdir -p "$CONFIG_DIR"
 
@@ -118,7 +115,56 @@ systemctl --user start pulseaudio
 
 # 9. Systemd servisi kur
 log_info "Systemd servisi kuruluyor..."
-sudo cp "$PROJECT_DIR/deploy/vakit-pi.service" /etc/systemd/system/
+
+# Service dosyasını dinamik olarak oluştur
+SERVICE_FILE="/tmp/vakit-pi.service"
+UV_PATH="$HOME/.local/bin/uv"
+
+cat > "$SERVICE_FILE" << EOF
+[Unit]
+Description=Vakit-Pi - Namaz Vakti ve Ezan Uygulaması
+Documentation=https://github.com/vakit-pi/vakit-pi
+After=network.target sound.target bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$USER
+WorkingDirectory=$PROJECT_DIR
+
+# Environment variables
+Environment="VAKIT_PI_HOST=0.0.0.0"
+Environment="VAKIT_PI_PORT=8080"
+Environment="VAKIT_PI_LOG_LEVEL=INFO"
+Environment="VAKIT_PI_SETTINGS_PATH=$CONFIG_DIR/settings.json"
+
+# Uygulama komutu (uv kullanarak)
+ExecStart=$UV_PATH run vakit-pi serve
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=$CONFIG_DIR
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vakit-pi
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo cp "$SERVICE_FILE" /etc/systemd/system/vakit-pi.service
+rm "$SERVICE_FILE"
 sudo systemctl daemon-reload
 sudo systemctl enable vakit-pi
 

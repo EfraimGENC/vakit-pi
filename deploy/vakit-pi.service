@@ -1,3 +1,14 @@
+# Vakit-Pi Systemd Service Template
+# ===================================
+# NOT: Bu dosya bir şablondur!
+# install.sh scripti bu dosyayı otomatik olarak doğru yollarla oluşturur.
+# Manuel kurulum yapıyorsanız, aşağıdaki değerleri kendi sisteminize göre düzenleyin:
+#   - User/Group: Kullanıcı adınız (örn: pi)
+#   - WorkingDirectory: Proje dizini (örn: /home/efraim/vakit-pi)
+#   - VAKIT_PI_SETTINGS_PATH: Ayar dosyası yolu
+#   - ExecStart: uv yolu ve proje dizini
+#   - ReadWritePaths: Ayar dizini
+
 [Unit]
 Description=Vakit-Pi - Namaz Vakti ve Ezan Uygulaması
 Documentation=https://github.com/vakit-pi/vakit-pi
@@ -8,19 +19,19 @@ Wants=bluetooth.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi
+WorkingDirectory=/home/efraim/vakit-pi
 
 # Environment variables
 Environment="VAKIT_PI_HOST=0.0.0.0"
 Environment="VAKIT_PI_PORT=8080"
 Environment="VAKIT_PI_LOG_LEVEL=INFO"
-Environment="VAKIT_PI_SETTINGS_PATH=/home/pi/.config/vakit-pi/settings.json"
+Environment="VAKIT_PI_SETTINGS_PATH=/home/efraim/.config/vakit-pi/settings.json"
 
 # Uygulama komutu (uv kullanarak)
-ExecStart=/home/pi/.local/bin/uv run vakit-pi serve
+ExecStart=/home/efraim/.local/bin/uv run vakit-pi serve
 
 # Alternatif: pip ile kurulduysa
-# ExecStart=/home/pi/.local/bin/vakit-pi serve
+# ExecStart=/home/efraim/.local/bin/vakit-pi serve
 
 # Restart policy
 Restart=always
@@ -32,7 +43,7 @@ StartLimitBurst=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/pi/.config/vakit-pi
+ReadWritePaths=/home/efraim/.config/vakit-pi
 
 # Logging
 StandardOutput=journal
