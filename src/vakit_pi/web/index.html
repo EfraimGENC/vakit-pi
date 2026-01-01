@@ -490,6 +490,8 @@
 
           let clockInterval = null;
           let adhanCheckInterval = null;
+          let timesRefreshInterval = null;
+          let lastRefreshDate = null;
 
           // Icons mapping
           const icons = {
@@ -539,6 +541,14 @@
             currentTime.value = now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
             currentDate.value = formatDate(now);
             hijriDate.value = calculateHijriDate(now);
+            
+            // Gün değiştiyse vakitleri yenile
+            const today = now.toDateString();
+            if (lastRefreshDate && lastRefreshDate !== today) {
+              console.log("Gün değişti, vakitler yenileniyor...");
+              fetchTodayTimes();
+            }
+            lastRefreshDate = today;
           };
 
           // Mevcut namaz vaktini hesapla (client-side)
@@ -549,6 +559,16 @@
             
             const prayers = todayTimes.value.prayers;
             let current = null;
+            
+            // İmsak vaktini al
+            const imsakPrayer = prayers.find(p => p.name === 'imsak');
+            const [imsakH, imsakM] = imsakPrayer ? imsakPrayer.time.split(":").map(Number) : [5, 0];
+            const imsakMinutes = imsakH * 60 + imsakM;
+            
+            // Gece yarısından sonra ama imsaktan önce ise, yatsı vakti devam ediyor
+            if (nowMinutes < imsakMinutes) {
+              return 'yatsi';
+            }
             
             for (const prayer of prayers) {
               const [h, m] = prayer.time.split(":").map(Number);
@@ -575,7 +595,7 @@
                 return prayer;
               }
             }
-            // Gece yarısından sonra, ertesi günün ilk vakti (imsak)
+            // Tüm vakitler geçtiyse, ertesi günün ilk vakti (imsak)
             return prayers[0];
           });
 
@@ -797,20 +817,17 @@
             // Ezan durumunu 5 saniyede bir kontrol et (sadece bu için API)
             adhanCheckInterval = setInterval(checkAdhanStatus, 5000);
             
-            // Gece yarısında vakitleri yenile
-            const scheduleNextDayRefresh = () => {
-              const now = new Date();
-              const tomorrow = new Date(now);
-              tomorrow.setDate(tomorrow.getDate() + 1);
-              tomorrow.setHours(0, 0, 5, 0); // Gece yarısından 5 saniye sonra
-              const msUntilMidnight = tomorrow - now;
-              
-              setTimeout(() => {
+            // Vakitleri her 5 dakikada bir yenile (sekme arka planda kalırsa diye)
+            timesRefreshInterval = setInterval(fetchTodayTimes, 5 * 60 * 1000);
+            
+            // Sayfa görünür olduğunda vakitleri yenile (sekme arka plandan döndüğünde)
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') {
+                console.log("Sayfa tekrar görünür oldu, vakitler yenileniyor...");
                 fetchTodayTimes();
-                scheduleNextDayRefresh();
-              }, msUntilMidnight);
-            };
-            scheduleNextDayRefresh();
+                checkAdhanStatus();
+              }
+            });
           });
 
           onUnmounted(() => {
@@ -819,6 +836,9 @@
             }
             if (adhanCheckInterval) {
               clearInterval(adhanCheckInterval);
+            }
+            if (timesRefreshInterval) {
+              clearInterval(timesRefreshInterval);
             }
           });
 
