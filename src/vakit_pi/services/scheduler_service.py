@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta
+from typing import Any
 
 from vakit_pi.domain.events import PrayerTimeReachedEvent, PreAlertEvent
 from vakit_pi.domain.models import PrayerName, PrayerSettings, PrayerTime
@@ -50,10 +51,12 @@ class SchedulerService:
         base_id = f"prayer_{prayer.value}_{date.strftime('%Y%m%d')}"
         return f"{base_id}_{suffix}" if suffix else base_id
 
-    def _create_adhan_callback(self, prayer_time: PrayerTime) -> Callable[[], None]:
+    def _create_adhan_callback(
+        self, prayer_time: PrayerTime
+    ) -> Callable[[], Coroutine[Any, Any, None]]:
         """Ezan çalma callback'i oluştur."""
 
-        def callback() -> None:
+        async def callback() -> None:
             logger.info(f"Ezan vakti geldi: {prayer_time.name.display_name}")
 
             if self._event_bus:
@@ -64,9 +67,8 @@ class SchedulerService:
                     )
                 )
 
-            # Async fonksiyonu sync context'te çalıştır
-            # Task referansını saklamak gerekmiyor çünkü fire-and-forget pattern
-            asyncio.create_task(self._adhan_service.play_adhan(prayer_time.name))  # noqa: RUF006
+            # Async fonksiyon olarak doğrudan çalıştır
+            await self._adhan_service.play_adhan(prayer_time.name)
 
         return callback
 
