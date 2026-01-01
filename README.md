@@ -233,6 +233,15 @@ uv run mypy src/
 uv run pytest
 ```
 
+## Sunucuda Güncelleme
+
+```bash
+cd vakit-pi
+git pull origin main
+uv sync
+sudo systemctl restart vakit-pi
+```
+
 ## Lisans
 
 MIT License - Detaylar için [LICENSE](LICENSE) dosyasına bakın.
