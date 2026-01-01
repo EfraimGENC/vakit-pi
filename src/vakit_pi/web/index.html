@@ -554,6 +554,8 @@
           // Mevcut namaz vaktini hesapla (client-side)
           const currentPrayer = computed(() => {
             if (!todayTimes.value?.prayers) return null;
+            // currentTime.value'yi kullanarak reaktiviteyi tetikle
+            const _ = currentTime.value;
             const now = new Date();
             const nowMinutes = now.getHours() * 60 + now.getMinutes();
             
@@ -583,6 +585,8 @@
           // Sonraki namaz vaktini hesapla (client-side)
           const nextPrayer = computed(() => {
             if (!todayTimes.value?.prayers) return null;
+            // currentTime.value'yi kullanarak reaktiviteyi tetikle
+            const _ = currentTime.value;
             const now = new Date();
             const nowMinutes = now.getHours() * 60 + now.getMinutes();
             
@@ -602,6 +606,9 @@
           // Geri sayım hesapla (client-side)
           const countdown = computed(() => {
             if (!nextPrayer.value) return "--:--:--";
+            // currentTime.value'yi kullanarak reaktiviteyi tetikle
+            // Bu sayede her saniye countdown yeniden hesaplanır
+            const _ = currentTime.value;
             const now = new Date();
             const [h, m] = nextPrayer.value.time.split(":").map(Number);
             
