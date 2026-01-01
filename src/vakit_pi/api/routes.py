@@ -346,6 +346,14 @@ async def stop_audio(state: Annotated[AppState, Depends(get_app_state)]) -> ApiR
     return ApiResponse(success=True, message="Ses durduruldu.")
 
 
+@router.get("/audio/playing")
+async def get_audio_playing_status(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> dict[str, bool]:
+    """Ezan çalıp çalmadığını kontrol et. Hafif endpoint."""
+    return {"is_playing": state.adhan_service.is_playing()}
+
+
 @router.get("/audio/adhan-types")
 async def get_adhan_types() -> list[dict[str, str]]:
     """Kullanılabilir ezan türlerini listele."""

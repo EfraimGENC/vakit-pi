@@ -464,7 +464,6 @@
           // State
           const loading = ref(true);
           const currentTab = ref("home");
-          const currentState = ref(null);
           const todayTimes = ref(null);
           const settings = ref({
             location: { latitude: 41.0, longitude: 29.0, city: "" },
@@ -482,8 +481,15 @@
           const testingAudio = ref(false);
           const testDuration = ref(10);
           const toast = ref({ show: false, message: "", type: "success" });
+          const isAdhanPlaying = ref(false);
 
-          let refreshInterval = null;
+          // Client-side time state
+          const currentTime = ref("--:--:--");
+          const currentDate = ref("");
+          const hijriDate = ref("");
+
+          let clockInterval = null;
+          let adhanCheckInterval = null;
 
           // Icons mapping
           const icons = {
@@ -497,16 +503,121 @@
 
           const getIcon = (prayer) => icons[prayer] || "🕌";
 
-          // API calls
-          const fetchCurrentState = async () => {
-            try {
-              const res = await fetch(`${API_BASE}/current`);
-              currentState.value = await res.json();
-            } catch (e) {
-              console.error("Durum alınamadı:", e);
-            }
+          // Hicri tarih hesaplama
+          const calculateHijriDate = (date) => {
+            const jd = Math.floor(date.getTime() / 86400000 + 2440587.5);
+            let l = jd - 1948440 + 10632;
+            const n = Math.floor((l - 1) / 10631);
+            l = l - 10631 * n + 354;
+            const j = Math.floor((10985 - l) / 5316) * Math.floor((50 * l) / 17719) + 
+                      Math.floor(l / 5670) * Math.floor((43 * l) / 15238);
+            l = l - Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) - 
+                Math.floor(j / 16) * Math.floor((15238 * j) / 43) + 29;
+            const month = Math.floor((24 * l) / 709);
+            const day = l - Math.floor((709 * month) / 24);
+            const year = 30 * n + j - 30;
+            
+            const months = [
+              "Muharrem", "Safer", "Rebiülevvel", "Rebiülahir",
+              "Cemaziyelevvel", "Cemaziyelahir", "Recep", "Şaban",
+              "Ramazan", "Şevval", "Zilkade", "Zilhicce"
+            ];
+            return `${day} ${months[month - 1]} ${year}`;
           };
 
+          // Tarih formatlama
+          const formatDate = (date) => {
+            const days = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+            const months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+                           "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+            return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}, ${days[date.getDay()]}`;
+          };
+
+          // Saati güncelle (her saniye client-side)
+          const updateClock = () => {
+            const now = new Date();
+            currentTime.value = now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            currentDate.value = formatDate(now);
+            hijriDate.value = calculateHijriDate(now);
+          };
+
+          // Mevcut namaz vaktini hesapla (client-side)
+          const currentPrayer = computed(() => {
+            if (!todayTimes.value?.prayers) return null;
+            const now = new Date();
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+            
+            const prayers = todayTimes.value.prayers;
+            let current = null;
+            
+            for (const prayer of prayers) {
+              const [h, m] = prayer.time.split(":").map(Number);
+              const prayerMinutes = h * 60 + m;
+              if (nowMinutes >= prayerMinutes) {
+                current = prayer.name;
+              }
+            }
+            return current;
+          });
+
+          // Sonraki namaz vaktini hesapla (client-side)
+          const nextPrayer = computed(() => {
+            if (!todayTimes.value?.prayers) return null;
+            const now = new Date();
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+            
+            const prayers = todayTimes.value.prayers;
+            
+            for (const prayer of prayers) {
+              const [h, m] = prayer.time.split(":").map(Number);
+              const prayerMinutes = h * 60 + m;
+              if (prayerMinutes > nowMinutes) {
+                return prayer;
+              }
+            }
+            // Gece yarısından sonra, ertesi günün ilk vakti (imsak)
+            return prayers[0];
+          });
+
+          // Geri sayım hesapla (client-side)
+          const countdown = computed(() => {
+            if (!nextPrayer.value) return "--:--:--";
+            const now = new Date();
+            const [h, m] = nextPrayer.value.time.split(":").map(Number);
+            
+            let target = new Date(now);
+            target.setHours(h, m, 0, 0);
+            
+            // Eğer hedef zaman geçtiyse, ertesi güne al
+            if (target <= now) {
+              target.setDate(target.getDate() + 1);
+            }
+            
+            const diff = target - now;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            
+            return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+          });
+
+          // Computed state for template compatibility
+          const currentState = computed(() => ({
+            current_time: currentTime.value,
+            current_date: currentDate.value,
+            hijri_date: hijriDate.value,
+            location: settings.value?.location,
+            current_prayer: currentPrayer.value,
+            current_prayer_display: currentPrayer.value ? 
+              todayTimes.value?.prayers?.find(p => p.name === currentPrayer.value)?.display_name : null,
+            next_prayer: nextPrayer.value?.name,
+            next_prayer_display: nextPrayer.value?.display_name,
+            next_prayer_time: nextPrayer.value?.time,
+            countdown: countdown.value,
+            is_adhan_playing: isAdhanPlaying.value,
+          }));
+
+          // API calls
           const fetchTodayTimes = async () => {
             try {
               const res = await fetch(`${API_BASE}/times/today`);
@@ -549,6 +660,17 @@
               prayerNames.value = await res.json();
             } catch (e) {
               console.error("Vakit isimleri alınamadı:", e);
+            }
+          };
+
+          // Ezan çalıp çalmadığını kontrol et (sadece bu için API çağrısı, 5 saniyede bir)
+          const checkAdhanStatus = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/audio/playing`);
+              const data = await res.json();
+              isAdhanPlaying.value = data.is_playing;
+            } catch (e) {
+              // Sessizce başarısız ol
             }
           };
 
@@ -657,8 +779,10 @@
 
           // Initialize
           onMounted(async () => {
+            // İlk saat güncellemesi
+            updateClock();
+            
             await Promise.all([
-              fetchCurrentState(),
               fetchTodayTimes(),
               fetchSettings(),
               fetchSystemStatus(),
@@ -667,13 +791,34 @@
             ]);
             loading.value = false;
 
-            // Her saniye güncel durumu al
-            refreshInterval = setInterval(fetchCurrentState, 1000);
+            // Her saniye saati güncelle (client-side, API çağrısı yok)
+            clockInterval = setInterval(updateClock, 1000);
+            
+            // Ezan durumunu 5 saniyede bir kontrol et (sadece bu için API)
+            adhanCheckInterval = setInterval(checkAdhanStatus, 5000);
+            
+            // Gece yarısında vakitleri yenile
+            const scheduleNextDayRefresh = () => {
+              const now = new Date();
+              const tomorrow = new Date(now);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              tomorrow.setHours(0, 0, 5, 0); // Gece yarısından 5 saniye sonra
+              const msUntilMidnight = tomorrow - now;
+              
+              setTimeout(() => {
+                fetchTodayTimes();
+                scheduleNextDayRefresh();
+              }, msUntilMidnight);
+            };
+            scheduleNextDayRefresh();
           });
 
           onUnmounted(() => {
-            if (refreshInterval) {
-              clearInterval(refreshInterval);
+            if (clockInterval) {
+              clearInterval(clockInterval);
+            }
+            if (adhanCheckInterval) {
+              clearInterval(adhanCheckInterval);
             }
           });
 
