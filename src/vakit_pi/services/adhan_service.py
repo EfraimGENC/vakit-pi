@@ -49,10 +49,36 @@ class AdhanService:
         """Ayarları güncelle."""
         self._settings = settings
 
-    def get_adhan_path(self, adhan_type: AdhanType | None = None) -> Path:
-        """Ezan ses dosyasının yolunu döndür."""
+    def get_adhan_path(
+        self, adhan_type: AdhanType | None = None, prayer: PrayerName | None = None
+    ) -> Path:
+        """
+        Ezan ses dosyasının yolunu döndür.
+
+        Önce vakite özel dosya aranır (örn: adhan_istanbul_ogle.mp3),
+        bulunamazsa varsayılan dosya döndürülür (örn: adhan_istanbul.mp3).
+
+        Args:
+            adhan_type: Ezan türü (None ise ayarlardan alınır)
+            prayer: Namaz vakti (None ise vakite özel dosya aranmaz)
+
+        Returns:
+            Ezan ses dosyasının yolu
+        """
         if adhan_type is None:
             adhan_type = self._settings.adhan_type
+
+        # Vakite özel dosya kontrolü
+        if prayer is not None:
+            prayer_specific_filename = f"adhan_{adhan_type.value}_{prayer.value}.mp3"
+            prayer_specific_path = self._audio_dir / prayer_specific_filename
+            if prayer_specific_path.exists():
+                logger.debug(
+                    f"Vakite özel ezan dosyası bulundu: {prayer_specific_filename}"
+                )
+                return prayer_specific_path
+
+        # Varsayılan dosya
         return self._audio_dir / adhan_type.filename
 
     async def play_adhan(self, prayer: PrayerName) -> None:
@@ -71,7 +97,7 @@ class AdhanService:
             return
 
         volume = self._settings.volume.get_volume(prayer)
-        adhan_path = self.get_adhan_path()
+        adhan_path = self.get_adhan_path(prayer=prayer)
 
         if not adhan_path.exists():
             error_msg = f"Ezan dosyası bulunamadı: {adhan_path}"
