@@ -93,6 +93,30 @@
           transform: rotate(360deg);
         }
       }
+      .adhan-playing {
+        animation: adhan-glow 1.5s ease-in-out infinite;
+      }
+      @keyframes adhan-glow {
+        0%,
+        100% {
+          box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(34, 197, 94, 0.6);
+        }
+      }
+      .animate-pulse {
+        animation: pulse 1s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
     </style>
   </head>
   <body class="gradient-bg min-h-screen text-white">
@@ -143,18 +167,22 @@
               </p>
             </div>
 
-            <!-- Ezan Çalıyor Bildirimi -->
-            <div
-              v-if="currentState?.is_adhan_playing"
-              class="mt-4 bg-emerald-500/20 rounded-xl py-3 px-4 flex items-center justify-center gap-2"
-            >
-              <span class="text-2xl">🔊</span>
-              <span class="text-emerald-400 font-medium">Ezan Okunuyor</span>
+            <!-- Ezan Çalıyor Bildirimi ve Durdur Butonu -->
+            <div v-if="currentState?.is_adhan_playing" class="mt-4 space-y-3">
+              <div
+                class="bg-emerald-500/20 rounded-xl py-3 px-4 flex items-center justify-center gap-2 adhan-playing"
+              >
+                <span class="text-2xl animate-pulse">🔊</span>
+                <span class="text-emerald-400 font-medium text-lg"
+                  >Ezan Okunuyor</span
+                >
+              </div>
               <button
                 @click="stopAdhan"
-                class="ml-4 bg-red-500/50 hover:bg-red-500 px-3 py-1 rounded-lg text-sm"
+                class="w-full bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-xl py-4 text-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
               >
-                Durdur
+                <span class="text-xl">⏹️</span>
+                Ezanı Durdur
               </button>
             </div>
           </div>
@@ -511,37 +539,76 @@
             let l = jd - 1948440 + 10632;
             const n = Math.floor((l - 1) / 10631);
             l = l - 10631 * n + 354;
-            const j = Math.floor((10985 - l) / 5316) * Math.floor((50 * l) / 17719) + 
-                      Math.floor(l / 5670) * Math.floor((43 * l) / 15238);
-            l = l - Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) - 
-                Math.floor(j / 16) * Math.floor((15238 * j) / 43) + 29;
+            const j =
+              Math.floor((10985 - l) / 5316) * Math.floor((50 * l) / 17719) +
+              Math.floor(l / 5670) * Math.floor((43 * l) / 15238);
+            l =
+              l -
+              Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) -
+              Math.floor(j / 16) * Math.floor((15238 * j) / 43) +
+              29;
             const month = Math.floor((24 * l) / 709);
             const day = l - Math.floor((709 * month) / 24);
             const year = 30 * n + j - 30;
-            
+
             const months = [
-              "Muharrem", "Safer", "Rebiülevvel", "Rebiülahir",
-              "Cemaziyelevvel", "Cemaziyelahir", "Recep", "Şaban",
-              "Ramazan", "Şevval", "Zilkade", "Zilhicce"
+              "Muharrem",
+              "Safer",
+              "Rebiülevvel",
+              "Rebiülahir",
+              "Cemaziyelevvel",
+              "Cemaziyelahir",
+              "Recep",
+              "Şaban",
+              "Ramazan",
+              "Şevval",
+              "Zilkade",
+              "Zilhicce",
             ];
             return `${day} ${months[month - 1]} ${year}`;
           };
 
           // Tarih formatlama
           const formatDate = (date) => {
-            const days = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
-            const months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-                           "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-            return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}, ${days[date.getDay()]}`;
+            const days = [
+              "Pazar",
+              "Pazartesi",
+              "Salı",
+              "Çarşamba",
+              "Perşembe",
+              "Cuma",
+              "Cumartesi",
+            ];
+            const months = [
+              "Ocak",
+              "Şubat",
+              "Mart",
+              "Nisan",
+              "Mayıs",
+              "Haziran",
+              "Temmuz",
+              "Ağustos",
+              "Eylül",
+              "Ekim",
+              "Kasım",
+              "Aralık",
+            ];
+            return `${date.getDate()} ${
+              months[date.getMonth()]
+            } ${date.getFullYear()}, ${days[date.getDay()]}`;
           };
 
           // Saati güncelle (her saniye client-side)
           const updateClock = () => {
             const now = new Date();
-            currentTime.value = now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            currentTime.value = now.toLocaleTimeString("tr-TR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
             currentDate.value = formatDate(now);
             hijriDate.value = calculateHijriDate(now);
-            
+
             // Gün değiştiyse vakitleri yenile
             const today = now.toDateString();
             if (lastRefreshDate && lastRefreshDate !== today) {
@@ -558,20 +625,22 @@
             const _ = currentTime.value;
             const now = new Date();
             const nowMinutes = now.getHours() * 60 + now.getMinutes();
-            
+
             const prayers = todayTimes.value.prayers;
             let current = null;
-            
+
             // İmsak vaktini al
-            const imsakPrayer = prayers.find(p => p.name === 'imsak');
-            const [imsakH, imsakM] = imsakPrayer ? imsakPrayer.time.split(":").map(Number) : [5, 0];
+            const imsakPrayer = prayers.find((p) => p.name === "imsak");
+            const [imsakH, imsakM] = imsakPrayer
+              ? imsakPrayer.time.split(":").map(Number)
+              : [5, 0];
             const imsakMinutes = imsakH * 60 + imsakM;
-            
+
             // Gece yarısından sonra ama imsaktan önce ise, yatsı vakti devam ediyor
             if (nowMinutes < imsakMinutes) {
-              return 'yatsi';
+              return "yatsi";
             }
-            
+
             for (const prayer of prayers) {
               const [h, m] = prayer.time.split(":").map(Number);
               const prayerMinutes = h * 60 + m;
@@ -589,9 +658,9 @@
             const _ = currentTime.value;
             const now = new Date();
             const nowMinutes = now.getHours() * 60 + now.getMinutes();
-            
+
             const prayers = todayTimes.value.prayers;
-            
+
             for (const prayer of prayers) {
               const [h, m] = prayer.time.split(":").map(Number);
               const prayerMinutes = h * 60 + m;
@@ -611,21 +680,23 @@
             const _ = currentTime.value;
             const now = new Date();
             const [h, m] = nextPrayer.value.time.split(":").map(Number);
-            
+
             let target = new Date(now);
             target.setHours(h, m, 0, 0);
-            
+
             // Eğer hedef zaman geçtiyse, ertesi güne al
             if (target <= now) {
               target.setDate(target.getDate() + 1);
             }
-            
+
             const diff = target - now;
             const hours = Math.floor(diff / 3600000);
             const minutes = Math.floor((diff % 3600000) / 60000);
             const seconds = Math.floor((diff % 60000) / 1000);
-            
-            return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+            return `${hours.toString().padStart(2, "0")}:${minutes
+              .toString()
+              .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
           });
 
           // Computed state for template compatibility
@@ -635,8 +706,11 @@
             hijri_date: hijriDate.value,
             location: settings.value?.location,
             current_prayer: currentPrayer.value,
-            current_prayer_display: currentPrayer.value ? 
-              todayTimes.value?.prayers?.find(p => p.name === currentPrayer.value)?.display_name : null,
+            current_prayer_display: currentPrayer.value
+              ? todayTimes.value?.prayers?.find(
+                  (p) => p.name === currentPrayer.value
+                )?.display_name
+              : null,
             next_prayer: nextPrayer.value?.name,
             next_prayer_display: nextPrayer.value?.display_name,
             next_prayer_time: nextPrayer.value?.time,
@@ -808,7 +882,7 @@
           onMounted(async () => {
             // İlk saat güncellemesi
             updateClock();
-            
+
             await Promise.all([
               fetchTodayTimes(),
               fetchSettings(),
@@ -820,17 +894,19 @@
 
             // Her saniye saati güncelle (client-side, API çağrısı yok)
             clockInterval = setInterval(updateClock, 1000);
-            
+
             // Ezan durumunu 5 saniyede bir kontrol et (sadece bu için API)
             adhanCheckInterval = setInterval(checkAdhanStatus, 5000);
-            
+
             // Vakitleri her 5 dakikada bir yenile (sekme arka planda kalırsa diye)
             timesRefreshInterval = setInterval(fetchTodayTimes, 5 * 60 * 1000);
-            
+
             // Sayfa görünür olduğunda vakitleri yenile (sekme arka plandan döndüğünde)
-            document.addEventListener('visibilitychange', () => {
-              if (document.visibilityState === 'visible') {
-                console.log("Sayfa tekrar görünür oldu, vakitler yenileniyor...");
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "visible") {
+                console.log(
+                  "Sayfa tekrar görünür oldu, vakitler yenileniyor..."
+                );
                 fetchTodayTimes();
                 checkAdhanStatus();
               }
