@@ -8,7 +8,6 @@ from typing import Any
 
 from vakit_pi.domain.events import PrayerTimeReachedEvent, PreAlertEvent
 from vakit_pi.domain.models import PrayerName, PrayerSettings, PrayerTime
-from vakit_pi.infrastructure.audio import speak_tts
 from vakit_pi.services.adhan_service import AdhanService
 from vakit_pi.services.ports import EventBusPort, SchedulerPort
 from vakit_pi.services.prayer_service import PrayerService
@@ -89,7 +88,9 @@ class SchedulerService:
                     )
                 )
 
-            # TTS ile ön uyarı anonsu
+            # TTS ile ön uyarı anonsu (döngüsel import'u önlemek için lazy import)
+            from vakit_pi.infrastructure.audio import speak_tts
+
             announcement = (
                 f"Sayın cemati müslimin; {prayer_time.name.display_name} vaktine "
                 f"son {minutes_before} dakika. Allah kabul etsin."
