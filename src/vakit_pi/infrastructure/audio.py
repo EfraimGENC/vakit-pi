@@ -202,3 +202,33 @@ def get_best_player() -> BaseAudioPlayer:
     raise RuntimeError(
         "Hiçbir ses oynatıcı bulunamadı. mpg123, ffplay, paplay veya aplay kurulu olmalı."
     )
+
+
+async def speak_tts(text: str, voice: str = "tr-TR-AhmetNeural") -> None:
+    """
+    edge-tts kullanarak metni sesli oku.
+
+    Args:
+        text: Okunacak metin
+        voice: Kullanılacak ses (varsayılan: tr-TR-AhmetNeural)
+    """
+    if shutil.which("edge-tts") is None or shutil.which("mpg123") is None:
+        logger.warning("TTS için edge-tts ve mpg123 gerekli")
+        return
+
+    cmd = f'edge-tts --voice {voice} --text "{text}" --write-media - | mpg123 -q -'
+    logger.info(f"TTS çalıştırılıyor: {text}")
+
+    try:
+        process = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            error_msg = stderr.decode().strip() if stderr else ""
+            logger.warning(f"TTS hatası: {error_msg}")
+    except Exception as e:
+        logger.error(f"TTS çalıştırma hatası: {e}")

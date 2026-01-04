@@ -8,6 +8,7 @@ from typing import Any
 
 from vakit_pi.domain.events import PrayerTimeReachedEvent, PreAlertEvent
 from vakit_pi.domain.models import PrayerName, PrayerSettings, PrayerTime
+from vakit_pi.infrastructure.audio import speak_tts
 from vakit_pi.services.adhan_service import AdhanService
 from vakit_pi.services.ports import EventBusPort, SchedulerPort
 from vakit_pi.services.prayer_service import PrayerService
@@ -74,10 +75,10 @@ class SchedulerService:
 
     def _create_pre_alert_callback(
         self, prayer_time: PrayerTime, minutes_before: int
-    ) -> Callable[[], None]:
+    ) -> Callable[[], Coroutine[Any, Any, None]]:
         """Ön uyarı callback'i oluştur."""
 
-        def callback() -> None:
+        async def callback() -> None:
             logger.info(f"{prayer_time.name.display_name} vaktine {minutes_before} dakika kaldı")
 
             if self._event_bus:
@@ -87,6 +88,13 @@ class SchedulerService:
                         minutes_before=minutes_before,
                     )
                 )
+
+            # TTS ile ön uyarı anonsu
+            announcement = (
+                f"Sayın cemati müslimin; {prayer_time.name.display_name} vaktine "
+                f"son {minutes_before} dakika. Allah kabul etsin."
+            )
+            await speak_tts(announcement)
 
         return callback
 
