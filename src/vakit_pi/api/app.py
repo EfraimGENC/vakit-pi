@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -33,7 +34,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Scheduler'ı başlat
     state.scheduler_adapter.start()
-    state.scheduler_service.schedule_day()
+    scheduled_today = state.scheduler_service.schedule_day()
+
+    # Bugün için planlanan iş yoksa (tüm vakitler geçmişse) yarını planla
+    if scheduled_today == 0:
+        tomorrow = datetime.now(state.prayer_service.timezone) + timedelta(days=1)
+        logger.info("Bugün için planlanan vakit yok, yarın planlanıyor.")
+        state.scheduler_service.schedule_day(tomorrow)
 
     logger.info("Vakit-Pi hazır!")
 
