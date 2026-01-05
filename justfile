@@ -47,6 +47,10 @@ stop:
 start:
     sudo systemctl start vakit-pi
 
+# Planlı işleri listele
+jobs:
+    @curl -s http://localhost:8080/api/scheduler/jobs | python3 -c "import sys,json; jobs=json.load(sys.stdin); print(f'📋 Planlı İşler ({len(jobs)} adet):\n' + '-'*50); [print(f\"{j['run_time'][11:16]}  {'🔔' if 'pre' in j['job_id'] else '🕌'}  {j['job_id']}\") for j in jobs]" 2>/dev/null || echo "❌ Servis çalışmıyor"
+
 # ─────────────────────────────────────────────────────────────
 # 🛠️ Geliştirme
 # ─────────────────────────────────────────────────────────────
