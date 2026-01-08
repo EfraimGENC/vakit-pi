@@ -57,18 +57,25 @@ class SchedulerService:
         """Ezan çalma callback'i oluştur."""
 
         async def callback() -> None:
-            logger.info(f"Ezan vakti geldi: {prayer_time.name.display_name}")
+            logger.info(f"[CALLBACK] Ezan callback tetiklendi: {prayer_time.name.display_name}")
 
-            if self._event_bus:
-                self._event_bus.publish(
-                    PrayerTimeReachedEvent(
-                        prayer_time=prayer_time,
-                        should_play_adhan=self.settings.is_prayer_enabled(prayer_time.name),
+            try:
+                logger.info(f"Ezan vakti geldi: {prayer_time.name.display_name}")
+
+                if self._event_bus:
+                    self._event_bus.publish(
+                        PrayerTimeReachedEvent(
+                            prayer_time=prayer_time,
+                            should_play_adhan=self.settings.is_prayer_enabled(prayer_time.name),
+                        )
                     )
-                )
 
-            # Async fonksiyon olarak doğrudan çalıştır
-            await self._adhan_service.play_adhan(prayer_time.name)
+                # Async fonksiyon olarak doğrudan çalıştır
+                await self._adhan_service.play_adhan(prayer_time.name)
+                logger.info(f"[CALLBACK] Ezan callback tamamlandı: {prayer_time.name.display_name}")
+            except Exception as e:
+                logger.error(f"[CALLBACK] Ezan callback hatası: {e}", exc_info=True)
+                raise
 
         return callback
 
@@ -78,24 +85,37 @@ class SchedulerService:
         """Ön uyarı callback'i oluştur."""
 
         async def callback() -> None:
-            logger.info(f"{prayer_time.name.display_name} vaktine {minutes_before} dakika kaldı")
+            logger.info(
+                f"[CALLBACK] Ön uyarı callback tetiklendi: {prayer_time.name.display_name}"
+            )
 
-            if self._event_bus:
-                self._event_bus.publish(
-                    PreAlertEvent(
-                        prayer_time=prayer_time,
-                        minutes_before=minutes_before,
-                    )
+            try:
+                logger.info(
+                    f"{prayer_time.name.display_name} vaktine {minutes_before} dakika kaldı"
                 )
 
-            # TTS ile ön uyarı anonsu (döngüsel import'u önlemek için lazy import)
-            from vakit_pi.infrastructure.audio import speak_tts
+                if self._event_bus:
+                    self._event_bus.publish(
+                        PreAlertEvent(
+                            prayer_time=prayer_time,
+                            minutes_before=minutes_before,
+                        )
+                    )
 
-            announcement = (
-                f"Sayın cemati müslimin; {prayer_time.name.display_name} vaktine "
-                f"son {minutes_before} dakika. Allah kabul etsin."
-            )
-            await speak_tts(announcement)
+                # TTS ile ön uyarı anonsu (döngüsel import'u önlemek için lazy import)
+                from vakit_pi.infrastructure.audio import speak_tts
+
+                announcement = (
+                    f"Sayın cemati müslimin; {prayer_time.name.display_name} vaktine "
+                    f"son {minutes_before} dakika. Allah kabul etsin."
+                )
+                await speak_tts(announcement)
+                logger.info(
+                    f"[CALLBACK] Ön uyarı callback tamamlandı: {prayer_time.name.display_name}"
+                )
+            except Exception as e:
+                logger.error(f"[CALLBACK] Ön uyarı callback hatası: {e}", exc_info=True)
+                raise
 
         return callback
 
@@ -189,9 +209,9 @@ class SchedulerService:
         # Her gece yarısı ertesi günü planla
         while self._running:
             now = datetime.now(self._prayer_service.timezone)
-            tomorrow = now.date() + timedelta(days=1)
+            tomorrow_date = now.date() + timedelta(days=1)
             next_midnight = datetime.combine(
-                tomorrow,
+                tomorrow_date,
                 datetime.min.time(),
                 tzinfo=self._prayer_service.timezone,
             )

@@ -1,8 +1,9 @@
 """Service layer interfaces (ports)."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from datetime import date, datetime
+from typing import Any
 
 from vakit_pi.domain.events import DomainEvent
 from vakit_pi.domain.models import (
@@ -63,7 +64,7 @@ class SchedulerPort(ABC):
     def schedule_at(
         self,
         run_time: datetime,
-        callback: Callable[[], None],
+        callback: Callable[[], None] | Callable[[], Coroutine[Any, Any, None]],
         job_id: str,
     ) -> None:
         """Belirtilen zamanda çalıştırılacak iş planla."""
