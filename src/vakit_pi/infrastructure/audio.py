@@ -212,23 +212,45 @@ async def speak_tts(text: str, voice: str = "tr-TR-AhmetNeural") -> None:
         text: Okunacak metin
         voice: Kullanılacak ses (varsayılan: tr-TR-AhmetNeural)
     """
-    if shutil.which("edge-tts") is None or shutil.which("mpg123") is None:
-        logger.warning("TTS için edge-tts ve mpg123 gerekli")
+    if shutil.which("mpg123") is None:
+        logger.warning("TTS için mpg123 gerekli")
         return
 
-    cmd = f'edge-tts --voice {voice} --text "{text}" --write-media - | mpg123 -q -'
+    try:
+        import edge_tts
+    except ImportError:
+        logger.warning("TTS için edge-tts paketi gerekli: uv add edge-tts")
+        return
+
     logger.info(f"TTS çalıştırılıyor: {text}")
 
     try:
-        process = await asyncio.create_subprocess_shell(
-            cmd,
+        communicate = edge_tts.Communicate(text, voice)
+
+        # edge-tts'den gelen audio'yu mpg123'e pipe et
+        process = await asyncio.create_subprocess_exec(
+            "mpg123", "-q", "-",
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
         )
+
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio" and process.stdin:
+                process.stdin.write(chunk["data"])
+                await process.stdin.drain()
+
+        if process.stdin:
+            process.stdin.close()
+            await process.stdin.wait_closed()
+
         _, stderr = await process.communicate()
 
         if process.returncode != 0:
             error_msg = stderr.decode().strip() if stderr else ""
             logger.warning(f"TTS hatası: {error_msg}")
+        else:
+            logger.info("TTS tamamlandı")
+
     except Exception as e:
         logger.error(f"TTS çalıştırma hatası: {e}")

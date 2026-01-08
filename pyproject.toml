@@ -40,6 +40,9 @@ dependencies = [
     
     # Internationalization
     "babel>=2.16.0",
+    
+    # Text-to-Speech
+    "edge-tts>=6.1.0",
 ]
 
 [project.optional-dependencies]
