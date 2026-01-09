@@ -1,10 +1,13 @@
 """FastAPI application factory."""
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,12 +18,54 @@ from vakit_pi import __version__
 from vakit_pi.api.dependencies import initialize_app_state, shutdown_app_state
 from vakit_pi.api.routes import router as api_router
 
+if TYPE_CHECKING:
+    from vakit_pi.api.dependencies import AppState
+
 logger = logging.getLogger(__name__)
+
+# Gece yarısı planlama task referansı
+_midnight_task: asyncio.Task[None] | None = None
+
+
+async def _midnight_scheduler_loop(state: "AppState") -> None:
+    """Her gece yarısı ertesi günün namaz vakitlerini planlar."""
+    while True:
+        try:
+            now = datetime.now(state.prayer_service.timezone)
+            tomorrow_date = now.date() + timedelta(days=1)
+            next_midnight = datetime.combine(
+                tomorrow_date,
+                datetime.min.time(),
+                tzinfo=state.prayer_service.timezone,
+            )
+
+            # Gece yarısına kadar bekle (+1 dakika güvenlik marjı)
+            wait_seconds = (next_midnight - now).total_seconds() + 60
+            logger.info(
+                f"Gece yarısı planlaması için {wait_seconds/3600:.1f} saat bekleniyor."
+            )
+
+            await asyncio.sleep(wait_seconds)
+
+            # Yeni günün vakitlerini planla
+            logger.info("Gece yarısı: Yeni gün için namaz vakitleri planlanıyor...")
+            scheduled = state.scheduler_service.schedule_day()
+            logger.info(f"Gece yarısı planlaması tamamlandı: {scheduled} iş planlandı.")
+
+        except asyncio.CancelledError:
+            logger.info("Gece yarısı planlama döngüsü iptal edildi.")
+            break
+        except Exception as e:
+            logger.error(f"Gece yarısı planlama hatası: {e}", exc_info=True)
+            # Hata durumunda 1 saat bekle ve tekrar dene
+            await asyncio.sleep(3600)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
+    global _midnight_task
+
     # Startup
     logger.info("Vakit-Pi başlatılıyor...")
 
@@ -42,12 +87,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Bugün için planlanan vakit yok, yarın planlanıyor.")
         state.scheduler_service.schedule_day(tomorrow)
 
+    # Gece yarısı planlama döngüsünü background task olarak başlat
+    _midnight_task = asyncio.create_task(_midnight_scheduler_loop(state))
+    logger.info("Gece yarısı planlama döngüsü başlatıldı.")
+
     logger.info("Vakit-Pi hazır!")
 
     yield
 
     # Shutdown
     logger.info("Vakit-Pi kapatılıyor...")
+
+    # Gece yarısı task'ını iptal et
+    if _midnight_task and not _midnight_task.done():
+        _midnight_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await _midnight_task
+
     await shutdown_app_state()
     logger.info("Vakit-Pi kapatıldı.")
 
