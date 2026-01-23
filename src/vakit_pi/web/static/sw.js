@@ -1,8 +1,6 @@
 // Vakit-Pi Service Worker
 // Minimal service worker for PWA compliance (no caching as per requirements)
 
-const CACHE_NAME = 'vakit-pi-v1';
-
 // Install event - required for service worker
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
