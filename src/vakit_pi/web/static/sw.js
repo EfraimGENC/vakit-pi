@@ -4,8 +4,8 @@
 // Install event - required for service worker
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
-  // Skip waiting to activate immediately
-  self.skipWaiting();
+  // Skip waiting to activate immediately, tied to install lifecycle
+  event.waitUntil(self.skipWaiting());
 });
 
 // Activate event - required for service worker
