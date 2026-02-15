@@ -19,11 +19,5 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Simply pass through all requests to the network
   // No caching as per requirements
-  event.respondWith(
-    fetch(event.request).catch((error) => {
-      console.error('Fetch failed:', error);
-      // Re-throw to let the browser handle it naturally
-      throw error;
-    })
-  );
+  event.respondWith(fetch(event.request));
 });
