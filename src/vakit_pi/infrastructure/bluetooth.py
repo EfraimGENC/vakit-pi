@@ -43,6 +43,33 @@ class BluetoothctlAdapter(BluetoothPort):
             logger.error("bluetoothctl bulunamadı. bluez paketi kurulu mu?")
             return -1, ""
 
+    async def _run_piped(self, bt_command: str, cmd_timeout: float = 15.0) -> tuple[int, str]:
+        """bluetoothctl'e stdin üzerinden komut gönder (interactive mod desteği)."""
+        logger.debug(f"Bluetooth pipe komutu: {bt_command}")
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bluetoothctl",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _stderr = await asyncio.wait_for(
+                proc.communicate(input=f"{bt_command}\nquit\n".encode()),
+                timeout=cmd_timeout,
+            )
+            output = stdout.decode().strip()
+            logger.debug(f"Bluetooth pipe çıktısı: {output[:200]}")
+            return proc.returncode or 0, output
+        except TimeoutError:
+            logger.warning(f"bluetoothctl pipe zaman aşımı: {bt_command}")
+            proc.kill()
+            await proc.wait()
+            return -1, ""
+        except FileNotFoundError:
+            logger.error("bluetoothctl bulunamadı. bluez paketi kurulu mu?")
+            return -1, ""
+
     async def list_paired_devices(self) -> list[dict[str, str]]:
         """Eşleşmiş Bluetooth cihazlarını listele."""
         rc, output = await self._run_command("devices", "Paired")
@@ -72,28 +99,40 @@ class BluetoothctlAdapter(BluetoothPort):
     async def connect(self, mac: str) -> bool:
         """Bluetooth cihaza bağlan."""
         logger.info(f"Bluetooth bağlantısı deneniyor: {mac}")
-        rc, output = await self._run_command("connect", mac, cmd_timeout=15.0)
 
-        success = rc == 0 and "Connection successful" in output
-        if success:
+        # Önce trust et (auto-reconnect için gerekli)
+        await self._run_command("trust", mac, cmd_timeout=5.0)
+
+        # Pipe yöntemi ile bağlan (interactive mod daha güvenilir)
+        _rc, output = await self._run_piped(f"connect {mac}", cmd_timeout=20.0)
+        logger.info(f"Bluetooth connect çıktısı: {output[:300]}")
+
+        # Bağlantı sonrası gerçek durumu kontrol et (çıktı parse etmek yerine)
+        await asyncio.sleep(2)
+        connected = await self.is_connected(mac)
+
+        if connected:
             logger.info(f"Bluetooth bağlantısı başarılı: {mac}")
         else:
-            logger.warning(f"Bluetooth bağlantısı başarısız: {mac} — {output}")
+            logger.warning(f"Bluetooth bağlantısı başarısız: {mac}")
 
-        return success
+        return connected
 
     async def disconnect(self, mac: str) -> bool:
         """Bluetooth bağlantısını kes."""
         logger.info(f"Bluetooth bağlantısı kesiliyor: {mac}")
-        rc, output = await self._run_command("disconnect", mac)
 
-        success = rc == 0 and "Successful disconnected" in output
-        if success:
+        await self._run_piped(f"disconnect {mac}", cmd_timeout=10.0)
+
+        await asyncio.sleep(1)
+        still_connected = await self.is_connected(mac)
+
+        if not still_connected:
             logger.info(f"Bluetooth bağlantısı kesildi: {mac}")
         else:
-            logger.warning(f"Bluetooth bağlantı kesme başarısız: {mac} — {output}")
+            logger.warning(f"Bluetooth bağlantı kesme başarısız: {mac}")
 
-        return success
+        return not still_connected
 
     async def is_connected(self, mac: str) -> bool:
         """Cihaz bağlı mı kontrol et."""
