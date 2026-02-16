@@ -1119,17 +1119,30 @@
 
     <!-- Service Worker Registration -->
     <script>
-      // Register service worker for PWA
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/sw.js')
-            .then((registration) => {
-              console.log('Service Worker registered successfully:', registration.scope);
-            })
-            .catch((error) => {
-              console.log('Service Worker registration failed:', error);
+          navigator.serviceWorker.register('/sw.js').then((registration) => {
+            console.log('SW registered:', registration.scope);
+
+            // Check for updates immediately and every 60 seconds
+            registration.update();
+            setInterval(() => registration.update(), 60 * 1000);
+
+            // When a new SW is found, reload when it activates
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (!newWorker) return;
+
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                  console.log('New version available, reloading...');
+                  window.location.reload();
+                }
+              });
             });
+          }).catch((err) => {
+            console.log('SW registration failed:', err);
+          });
         });
       }
     </script>

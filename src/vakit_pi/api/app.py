@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from vakit_pi import __version__
@@ -159,6 +159,17 @@ def create_app(
 
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+        @app.get("/sw.js")
+        async def serve_sw() -> Response:
+            """Serve service worker from root scope with no-cache headers."""
+            sw_path = static_dir / "sw.js"
+            content = sw_path.read_text()
+            return Response(
+                content=content,
+                media_type="application/javascript",
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
 
         @app.get("/")
         async def serve_index() -> FileResponse:
