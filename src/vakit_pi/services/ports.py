@@ -98,6 +98,26 @@ class EventBusPort(ABC):
         """Event tipine abone ol."""
 
 
+class BluetoothPort(ABC):
+    """Bluetooth cihaz yönetimi arayüzü (port)."""
+
+    @abstractmethod
+    async def list_paired_devices(self) -> list[dict[str, str]]:
+        """Eşleşmiş Bluetooth cihazlarını listele."""
+
+    @abstractmethod
+    async def connect(self, mac: str) -> bool:
+        """Bluetooth cihaza bağlan."""
+
+    @abstractmethod
+    async def disconnect(self, mac: str) -> bool:
+        """Bluetooth bağlantısını kes."""
+
+    @abstractmethod
+    async def is_connected(self, mac: str) -> bool:
+        """Cihaz bağlı mı?"""
+
+
 class GeocodingPort(ABC):
     """Geocoding (konum çözümleme) arayüzü."""
 

@@ -259,6 +259,7 @@ class PrayerSettings:
     pre_alert_minutes: int = 0
     fajr_isha_method: int = 2  # Diyanet metodu
     asr_fiqh: int = 1  # Hanefi mezhebi
+    bluetooth_device_mac: str | None = None
 
     def is_prayer_enabled(self, prayer: PrayerName) -> bool:
         """Belirtilen vakit için ezan aktif mi?"""
@@ -286,6 +287,7 @@ class PrayerSettings:
             "pre_alert_minutes": self.pre_alert_minutes,
             "fajr_isha_method": self.fajr_isha_method,
             "asr_fiqh": self.asr_fiqh,
+            "bluetooth_device_mac": self.bluetooth_device_mac,
         }
 
     @classmethod
@@ -315,4 +317,5 @@ class PrayerSettings:
             pre_alert_minutes=data.get("pre_alert_minutes", 0),
             fajr_isha_method=data.get("fajr_isha_method", 2),
             asr_fiqh=data.get("asr_fiqh", 1),
+            bluetooth_device_mac=data.get("bluetooth_device_mac"),
         )

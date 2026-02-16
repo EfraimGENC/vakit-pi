@@ -23,8 +23,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Gece yarısı planlama task referansı
+# Background task referansları
 _midnight_task: asyncio.Task[None] | None = None
+_bt_connect_task: asyncio.Task[None] | None = None
 
 
 async def _midnight_scheduler_loop(state: "AppState") -> None:
@@ -41,9 +42,7 @@ async def _midnight_scheduler_loop(state: "AppState") -> None:
 
             # Gece yarısına kadar bekle (+1 dakika güvenlik marjı)
             wait_seconds = (next_midnight - now).total_seconds() + 60
-            logger.info(
-                f"Gece yarısı planlaması için {wait_seconds/3600:.1f} saat bekleniyor."
-            )
+            logger.info(f"Gece yarısı planlaması için {wait_seconds / 3600:.1f} saat bekleniyor.")
 
             await asyncio.sleep(wait_seconds)
 
@@ -64,7 +63,7 @@ async def _midnight_scheduler_loop(state: "AppState") -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
-    global _midnight_task
+    global _midnight_task, _bt_connect_task
 
     # Startup
     logger.info("Vakit-Pi başlatılıyor...")
@@ -91,6 +90,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _midnight_task = asyncio.create_task(_midnight_scheduler_loop(state))
     logger.info("Gece yarısı planlama döngüsü başlatıldı.")
 
+    # Bluetooth auto-connect
+    bt_mac = state.settings.bluetooth_device_mac
+    if bt_mac:
+        _bt_connect_task = asyncio.create_task(state.bluetooth_adapter.auto_connect_loop(bt_mac))
+        logger.info(f"Bluetooth auto-connect başlatıldı: {bt_mac}")
+
     logger.info("Vakit-Pi hazır!")
 
     yield
@@ -98,11 +103,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown
     logger.info("Vakit-Pi kapatılıyor...")
 
-    # Gece yarısı task'ını iptal et
-    if _midnight_task and not _midnight_task.done():
-        _midnight_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await _midnight_task
+    # Background task'ları iptal et
+    for task in [_midnight_task, _bt_connect_task]:
+        if task and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
     await shutdown_app_state()
     logger.info("Vakit-Pi kapatıldı.")

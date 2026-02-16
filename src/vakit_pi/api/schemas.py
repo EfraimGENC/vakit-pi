@@ -134,6 +134,23 @@ class TestAudioRequest(BaseModel):
     duration: Annotated[int, Field(ge=5, le=120, description="Test süresi (saniye)")] = 10
 
 
+class BluetoothDeviceSchema(BaseModel):
+    """Bluetooth cihaz şeması."""
+
+    mac: str = Field(description="MAC adresi")
+    name: str = Field(description="Cihaz adı")
+    connected: bool = Field(description="Bağlı mı?")
+
+
+class BluetoothConnectRequest(BaseModel):
+    """Bluetooth bağlantı isteği."""
+
+    mac: str = Field(
+        description="Bağlanılacak cihazın MAC adresi",
+        pattern=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$",
+    )
+
+
 class ApiResponse(BaseModel):
     """Genel API yanıt şeması."""
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from vakit_pi.domain.models import PrayerSettings
 from vakit_pi.infrastructure.audio import BaseAudioPlayer, get_best_player
+from vakit_pi.infrastructure.bluetooth import BluetoothctlAdapter
 from vakit_pi.infrastructure.event_bus import InMemoryEventBus
 from vakit_pi.infrastructure.scheduler import APSchedulerAdapter
 from vakit_pi.infrastructure.settings_repository import JsonSettingsRepository
@@ -26,6 +27,7 @@ class AppState:
     scheduler_adapter: APSchedulerAdapter
     event_bus: InMemoryEventBus
     audio_player: BaseAudioPlayer
+    bluetooth_adapter: BluetoothctlAdapter
     started_at: datetime
     audio_dir: Path
 
@@ -65,6 +67,7 @@ async def initialize_app_state(
     event_bus = InMemoryEventBus()
     audio_player = get_best_player()
     scheduler_adapter = APSchedulerAdapter()
+    bluetooth_adapter = BluetoothctlAdapter()
 
     # Services
     prayer_service = PrayerService(
@@ -97,6 +100,7 @@ async def initialize_app_state(
         scheduler_adapter=scheduler_adapter,
         event_bus=event_bus,
         audio_player=audio_player,
+        bluetooth_adapter=bluetooth_adapter,
         started_at=datetime.now(),
         audio_dir=audio_dir,
     )

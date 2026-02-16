@@ -335,6 +335,82 @@
             </div>
           </div>
 
+          <!-- Bluetooth -->
+          <div class="glass rounded-2xl p-4 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-medium text-emerald-400">📶 Bluetooth</h3>
+              <button
+                @click="fetchBluetoothDevices"
+                :disabled="btLoading"
+                class="text-xs bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded-lg px-3 py-1 transition"
+              >
+                {{ btLoading ? 'Yükleniyor...' : '🔄 Yenile' }}
+              </button>
+            </div>
+
+            <!-- Bağlantı Durumu -->
+            <div v-if="btStatus.device_mac" class="mb-3 p-3 rounded-xl" :class="btStatus.connected ? 'bg-emerald-500/15' : 'bg-red-500/15'">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium">
+                    {{ btDeviceName(btStatus.device_mac) }}
+                  </p>
+                  <p class="text-xs text-gray-400">{{ btStatus.device_mac }}</p>
+                </div>
+                <span :class="btStatus.connected ? 'text-emerald-400' : 'text-red-400'" class="text-sm font-medium">
+                  {{ btStatus.connected ? '🟢 Bağlı' : '🔴 Bağlı Değil' }}
+                </span>
+              </div>
+              <div class="flex gap-2 mt-2">
+                <button
+                  v-if="!btStatus.connected"
+                  @click="btConnect(btStatus.device_mac)"
+                  :disabled="btConnecting"
+                  class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg py-2 text-xs transition"
+                >
+                  {{ btConnecting ? 'Bağlanıyor...' : '🔗 Bağlan' }}
+                </button>
+                <button
+                  v-if="btStatus.connected"
+                  @click="btDisconnect"
+                  :disabled="btConnecting"
+                  class="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-lg py-2 text-xs transition"
+                >
+                  Bağlantıyı Kes
+                </button>
+              </div>
+            </div>
+
+            <!-- Cihaz Listesi -->
+            <div v-if="btDevices.length > 0">
+              <p class="text-xs text-gray-400 mb-2">Eşleşmiş Cihazlar</p>
+              <div
+                v-for="device in btDevices"
+                :key="device.mac"
+                class="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
+              >
+                <div>
+                  <p class="text-sm">{{ device.name }}</p>
+                  <p class="text-xs text-gray-500">{{ device.mac }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span v-if="device.connected" class="text-xs text-emerald-400">Bağlı</span>
+                  <button
+                    v-if="!device.connected"
+                    @click="btConnect(device.mac)"
+                    :disabled="btConnecting"
+                    class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg px-3 py-1.5 text-xs transition"
+                  >
+                    Bağlan
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p v-else-if="!btLoading" class="text-xs text-gray-500">
+              Eşleşmiş Bluetooth cihaz bulunamadı.
+            </p>
+          </div>
+
           <!-- Vakit Bazlı Ses Seviyeleri -->
           <div class="glass rounded-2xl p-4 mb-4">
             <h3 class="font-medium text-emerald-400 mb-3">
@@ -521,6 +597,12 @@
           const testDuration = ref(10);
           const toast = ref({ show: false, message: "", type: "success" });
           const isAdhanPlaying = ref(false);
+
+          // Bluetooth state
+          const btDevices = ref([]);
+          const btStatus = ref({ device_mac: null, connected: false });
+          const btLoading = ref(false);
+          const btConnecting = ref(false);
 
           // Client-side time state
           const currentTime = ref("--:--:--");
@@ -882,6 +964,70 @@
             return mapping[prayer] || prayer;
           };
 
+          // Bluetooth functions
+          const fetchBluetoothDevices = async () => {
+            btLoading.value = true;
+            try {
+              const [devRes, statusRes] = await Promise.all([
+                fetch(`${API_BASE}/bluetooth/devices`),
+                fetch(`${API_BASE}/bluetooth/status`),
+              ]);
+              btDevices.value = await devRes.json();
+              btStatus.value = await statusRes.json();
+            } catch (e) {
+              console.error("Bluetooth bilgisi alınamadı:", e);
+            } finally {
+              btLoading.value = false;
+            }
+          };
+
+          const btConnect = async (mac) => {
+            btConnecting.value = true;
+            try {
+              const res = await fetch(`${API_BASE}/bluetooth/connect`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mac }),
+              });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                showToast("Bluetooth bağlantısı başarılı!", "success");
+              } else {
+                showToast(data.detail || data.message || "Bağlantı başarısız!", "error");
+              }
+              await fetchBluetoothDevices();
+            } catch (e) {
+              showToast("Bluetooth hatası: " + e.message, "error");
+            } finally {
+              btConnecting.value = false;
+            }
+          };
+
+          const btDisconnect = async () => {
+            btConnecting.value = true;
+            try {
+              const res = await fetch(`${API_BASE}/bluetooth/disconnect`, {
+                method: "POST",
+              });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                showToast("Bluetooth bağlantısı kesildi.", "success");
+              } else {
+                showToast(data.detail || data.message || "Bağlantı kesme başarısız!", "error");
+              }
+              await fetchBluetoothDevices();
+            } catch (e) {
+              showToast("Bluetooth hatası: " + e.message, "error");
+            } finally {
+              btConnecting.value = false;
+            }
+          };
+
+          const btDeviceName = (mac) => {
+            const device = btDevices.value.find((d) => d.mac === mac);
+            return device ? device.name : mac;
+          };
+
           const showToast = (message, type = "success") => {
             toast.value = { show: true, message, type };
             setTimeout(() => {
@@ -900,6 +1046,7 @@
               fetchSystemStatus(),
               fetchAdhanTypes(),
               fetchPrayerNames(),
+              fetchBluetoothDevices(),
             ]);
             loading.value = false;
 
@@ -957,6 +1104,14 @@
             togglePrayer,
             getVolumeForPrayer,
             setVolumeForPrayer,
+            btDevices,
+            btStatus,
+            btLoading,
+            btConnecting,
+            fetchBluetoothDevices,
+            btConnect,
+            btDisconnect,
+            btDeviceName,
           };
         },
       }).mount("#app");
