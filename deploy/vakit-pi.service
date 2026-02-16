@@ -31,7 +31,7 @@ Environment="VAKIT_PI_SETTINGS_PATH=/home/efraim/.config/vakit-pi/settings.json"
 Environment="PULSE_SERVER=/var/run/pulse/native"
 
 # Bluetooth adaptörünü aç (rfkill soft-block durumunda kalabilir)
-ExecStartPre=/usr/sbin/rfkill unblock bluetooth
+ExecStartPre=+/usr/sbin/rfkill unblock bluetooth
 
 # Uygulama komutu (uv kullanarak)
 ExecStart=/home/efraim/.local/bin/uv run vakit-pi serve
