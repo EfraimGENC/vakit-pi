@@ -73,9 +73,7 @@ class AdhanService:
             prayer_specific_filename = f"adhan_{adhan_type.value}_{prayer.value}.mp3"
             prayer_specific_path = self._audio_dir / prayer_specific_filename
             if prayer_specific_path.exists():
-                logger.debug(
-                    f"Vakite özel ezan dosyası bulundu: {prayer_specific_filename}"
-                )
+                logger.debug(f"Vakite özel ezan dosyası bulundu: {prayer_specific_filename}")
                 return prayer_specific_path
 
         # Varsayılan dosya
@@ -153,7 +151,7 @@ class AdhanService:
             Başarılı mı?
         """
         if volume is None:
-            volume = self._settings.volume.default
+            volume = 100
 
         adhan_path = self.get_adhan_path()
         if not adhan_path.exists():

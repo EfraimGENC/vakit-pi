@@ -118,6 +118,18 @@ class BluetoothPort(ABC):
         """Cihaz bağlı mı?"""
 
 
+class SystemVolumePort(ABC):
+    """Sistem ses seviyesi arayüzü (Bluetooth hoparlör seviyesi)."""
+
+    @abstractmethod
+    async def set_volume(self, volume: int) -> bool:
+        """Sistem ses seviyesini ayarla (0-100). Tüm Pi sesini etkiler."""
+
+    @abstractmethod
+    async def get_volume(self) -> int | None:
+        """Mevcut sistem ses seviyesini oku (0-100)."""
+
+
 class GeocodingPort(ABC):
     """Geocoding (konum çözümleme) arayüzü."""
 

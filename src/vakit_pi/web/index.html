@@ -291,16 +291,23 @@
             </div>
 
             <div class="mb-4">
-              <label class="text-sm text-gray-400 block mb-2"
-                >Genel Ses Seviyesi: {{ settings.volume.default }}%</label
-              >
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm text-gray-400"
+                  >Hoparlör Ses Seviyesi: {{ settings.volume.master }}%</label
+                >
+                <span v-if="masterVolSaving" class="text-xs text-amber-400">Kaydediliyor...</span>
+              </div>
               <input
                 type="range"
-                v-model.number="settings.volume.default"
+                v-model.number="settings.volume.master"
+                @change="saveMasterVolume"
                 min="0"
                 max="100"
                 class="w-full accent-emerald-500"
               />
+              <p class="text-xs text-gray-500 mt-1">
+                Bluetooth hoparlörün maksimum ses seviyesi. Tüm sesleri etkiler.
+              </p>
             </div>
 
             <div class="mb-4">
@@ -417,7 +424,7 @@
               🎚️ Vakit Bazlı Ses Seviyeleri
             </h3>
             <p class="text-xs text-gray-400 mb-4">
-              Boş bırakılırsa genel ses seviyesi kullanılır.
+              Hoparlör seviyesinin yüzdesi. %100 = hoparlör maksimum seviyesinde çalar.
             </p>
 
             <div v-for="prayer in prayerNames" :key="prayer.value" class="mb-3">
@@ -426,13 +433,12 @@
                   >{{ prayer.icon }} {{ prayer.display_name }}</span
                 >
                 <span class="text-xs text-gray-400">
-                  {{ getVolumeForPrayer(prayer.value) ?? 'Varsayılan' }}{{
-                  getVolumeForPrayer(prayer.value) !== null ? '%' : '' }}
+                  {{ getVolumeForPrayer(prayer.value) }}%
                 </span>
               </div>
               <input
                 type="range"
-                :value="getVolumeForPrayer(prayer.value) ?? settings.volume.default"
+                :value="getVolumeForPrayer(prayer.value)"
                 @input="setVolumeForPrayer(prayer.value, $event.target.value)"
                 min="0"
                 max="100"
@@ -584,11 +590,12 @@
             location: { latitude: 41.0, longitude: 29.0, city: "" },
             adhan_type: "istanbul",
             offsets: {},
-            volume: { default: 80 },
+            volume: { master: 80, fajr: 100, sunrise: 100, dhuhr: 100, asr: 100, maghrib: 100, isha: 100 },
             enabled_prayers: [],
             pre_alert_minutes: 0,
             asr_fiqh: 1,
           });
+          const masterVolSaving = ref(false);
           const systemStatus = ref(null);
           const adhanTypes = ref([]);
           const prayerNames = ref([]);
@@ -890,6 +897,27 @@
             }
           };
 
+          const saveMasterVolume = async () => {
+            masterVolSaving.value = true;
+            try {
+              const res = await fetch(`${API_BASE}/audio/master-volume`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ volume: settings.value.volume.master }),
+              });
+              const data = await res.json();
+              if (data.success) {
+                showToast(`Hoparlör sesi: ${settings.value.volume.master}%`, "success");
+              } else {
+                showToast("Ses seviyesi ayarlanamadı!", "error");
+              }
+            } catch (e) {
+              showToast("Hata: " + e.message, "error");
+            } finally {
+              masterVolSaving.value = false;
+            }
+          };
+
           const testAudio = async () => {
             testingAudio.value = true;
             try {
@@ -897,7 +925,6 @@
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  volume: settings.value.volume.default,
                   duration: testDuration.value,
                 }),
               });
@@ -944,7 +971,7 @@
 
           const getVolumeForPrayer = (prayer) => {
             const key = prayerToVolumeKey(prayer);
-            return settings.value.volume[key];
+            return settings.value.volume[key] ?? 100;
           };
 
           const setVolumeForPrayer = (prayer, value) => {
@@ -1096,8 +1123,10 @@
             testingAudio,
             testDuration,
             toast,
+            masterVolSaving,
             getIcon,
             saveSettings,
+            saveMasterVolume,
             testAudio,
             stopAudio,
             stopAdhan,

@@ -176,20 +176,26 @@ class PrayerTimes:
 
 @dataclass
 class VolumeSettings:
-    """Vakit bazlı ses seviyesi ayarları."""
+    """Ses seviyesi ayarları.
 
-    default: int = 80
-    fajr: int | None = None
-    sunrise: int | None = None
-    dhuhr: int | None = None
-    asr: int | None = None
-    maghrib: int | None = None
-    isha: int | None = None
+    master: Bluetooth hoparlör sistem ses seviyesi (0-100).
+            pactl ile ayarlanır, tüm Pi sesini etkiler ve reboot'a dayanır.
+    Vakit bazlı değerler: Master seviyenin yüzdesi (0-100).
+            %100 = master seviyede çalar (maksimum).
+    """
+
+    master: int = 80
+    fajr: int = 100
+    sunrise: int = 100
+    dhuhr: int = 100
+    asr: int = 100
+    maghrib: int = 100
+    isha: int = 100
 
     def __post_init__(self) -> None:
         """Ses seviyesi doğrulaması."""
         for name, value in [
-            ("default", self.default),
+            ("master", self.master),
             ("fajr", self.fajr),
             ("sunrise", self.sunrise),
             ("dhuhr", self.dhuhr),
@@ -197,11 +203,11 @@ class VolumeSettings:
             ("maghrib", self.maghrib),
             ("isha", self.isha),
         ]:
-            if value is not None and not 0 <= value <= 100:
+            if not 0 <= value <= 100:
                 raise ValueError(f"Geçersiz ses seviyesi ({name}): {value}")
 
     def get_volume(self, prayer: PrayerName) -> int:
-        """Belirtilen vakit için ses seviyesini döndür."""
+        """Belirtilen vakit için playback ses seviyesini döndür (master'ın yüzdesi, 0-100)."""
         mapping = {
             PrayerName.FAJR: self.fajr,
             PrayerName.SUNRISE: self.sunrise,
@@ -210,13 +216,12 @@ class VolumeSettings:
             PrayerName.MAGHRIB: self.maghrib,
             PrayerName.ISHA: self.isha,
         }
-        specific_volume = mapping[prayer]
-        return specific_volume if specific_volume is not None else self.default
+        return mapping[prayer]
 
-    def to_dict(self) -> dict[str, int | None]:
+    def to_dict(self) -> dict[str, int]:
         """Dictionary olarak döndür."""
         return {
-            "default": self.default,
+            "master": self.master,
             "fajr": self.fajr,
             "sunrise": self.sunrise,
             "dhuhr": self.dhuhr,
@@ -226,16 +231,23 @@ class VolumeSettings:
         }
 
     @classmethod
+    def _get_int(cls, data: dict[str, int | None], key: str, fallback: int) -> int:
+        """Dictionary'den int değer al, None ise fallback kullan."""
+        val = data.get(key)
+        return val if val is not None else fallback
+
+    @classmethod
     def from_dict(cls, data: dict[str, int | None]) -> Self:
         """Dictionary'den oluştur."""
+        master = data.get("master") or data.get("default") or 80
         return cls(
-            default=data.get("default", 80) or 80,
-            fajr=data.get("fajr"),
-            sunrise=data.get("sunrise"),
-            dhuhr=data.get("dhuhr"),
-            asr=data.get("asr"),
-            maghrib=data.get("maghrib"),
-            isha=data.get("isha"),
+            master=master,
+            fajr=cls._get_int(data, "fajr", 100),
+            sunrise=cls._get_int(data, "sunrise", 100),
+            dhuhr=cls._get_int(data, "dhuhr", 100),
+            asr=cls._get_int(data, "asr", 100),
+            maghrib=cls._get_int(data, "maghrib", 100),
+            isha=cls._get_int(data, "isha", 100),
         )
 
 

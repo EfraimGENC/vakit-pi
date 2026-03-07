@@ -99,33 +99,40 @@ class TestVolumeSettings:
     """VolumeSettings tests."""
 
     def test_default_volume(self) -> None:
-        """Test default volume."""
+        """Test default master volume."""
         vol = VolumeSettings()
-        assert vol.default == 80
+        assert vol.master == 80
 
     def test_prayer_specific_volume(self) -> None:
-        """Test prayer-specific volume."""
-        vol = VolumeSettings(default=80, fajr=50)
+        """Test prayer-specific volume as percentage of master."""
+        vol = VolumeSettings(master=80, fajr=50)
         assert vol.get_volume(PrayerName.FAJR) == 50
-        assert vol.get_volume(PrayerName.DHUHR) == 80  # Uses default
+        assert vol.get_volume(PrayerName.DHUHR) == 100  # Default is 100%
 
     def test_invalid_volume(self) -> None:
         """Test invalid volume raises error."""
         with pytest.raises(ValueError, match="Geçersiz ses seviyesi"):
-            VolumeSettings(default=150)
+            VolumeSettings(master=150)
 
     def test_to_dict(self) -> None:
         """Test serialization."""
-        vol = VolumeSettings(default=80, fajr=50)
+        vol = VolumeSettings(master=80, fajr=50)
         data = vol.to_dict()
-        assert data["default"] == 80
+        assert data["master"] == 80
         assert data["fajr"] == 50
 
     def test_from_dict(self) -> None:
         """Test deserialization."""
+        data = {"master": 70, "fajr": 40}
+        vol = VolumeSettings.from_dict(data)
+        assert vol.master == 70
+        assert vol.fajr == 40
+
+    def test_from_dict_legacy_default(self) -> None:
+        """Test deserialization with legacy 'default' key."""
         data = {"default": 70, "fajr": 40}
         vol = VolumeSettings.from_dict(data)
-        assert vol.default == 70
+        assert vol.master == 70
         assert vol.fajr == 40
 
 
@@ -244,4 +251,4 @@ class TestPrayerSettings:
         assert settings.adhan_type == AdhanType.MAKKAH
         assert settings.is_prayer_enabled(PrayerName.FAJR) is True
         assert settings.is_prayer_enabled(PrayerName.ASR) is False
-        assert settings.volume.default == 70
+        assert settings.volume.master == 70

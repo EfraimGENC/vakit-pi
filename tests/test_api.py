@@ -26,7 +26,7 @@ def mock_app_state():
     mock_state.settings = PrayerSettings(
         location=Location(latitude=41.0, longitude=29.0, city="İstanbul"),
         adhan_type=AdhanType.ISTANBUL,
-        volume=VolumeSettings(default=80),
+        volume=VolumeSettings(master=80),
     )
     mock_state.started_at = datetime.now()
     mock_state.settings_repository = MagicMock()
@@ -89,8 +89,8 @@ class TestApiSchemas:
         """Test volume schema validates correctly."""
         from vakit_pi.api.schemas import VolumeSettingsSchema
 
-        vol = VolumeSettingsSchema(default=80, fajr=50)
-        assert vol.default == 80
+        vol = VolumeSettingsSchema(master=80, fajr=50)
+        assert vol.master == 80
         assert vol.fajr == 50
 
     def test_volume_schema_invalid_value(self):
@@ -99,7 +99,7 @@ class TestApiSchemas:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            VolumeSettingsSchema(default=150)
+            VolumeSettingsSchema(master=150)
 
 
 class TestPrayerNamesEndpoint:

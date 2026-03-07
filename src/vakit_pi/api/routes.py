@@ -14,6 +14,7 @@ from vakit_pi.api.schemas import (
     BluetoothDeviceSchema,
     CurrentStateSchema,
     LocationSchema,
+    MasterVolumeRequest,
     PrayerOffsetsSchema,
     PrayerTimeSchema,
     PrayerTimesSchema,
@@ -207,7 +208,7 @@ async def get_settings(state: Annotated[AppState, Depends(get_app_state)]) -> Se
             isha=s.offsets.isha,
         ),
         volume=VolumeSettingsSchema(
-            default=s.volume.default,
+            master=s.volume.master,
             fajr=s.volume.fajr,
             sunrise=s.volume.sunrise,
             dhuhr=s.volume.dhuhr,
@@ -253,7 +254,7 @@ async def update_settings(
     new_volume = current.volume
     if update.volume:
         new_volume = VolumeSettings(
-            default=update.volume.default,
+            master=update.volume.master,
             fajr=update.volume.fajr,
             sunrise=update.volume.sunrise,
             dhuhr=update.volume.dhuhr,
@@ -284,6 +285,10 @@ async def update_settings(
     state.prayer_service.update_location(new_location)
     state.prayer_service.update_offsets(new_offsets)
     state.adhan_service.update_settings(new_settings)
+
+    # Master ses seviyesi değiştiyse sistem seviyesini güncelle
+    if new_volume.master != current.volume.master:
+        await state.system_volume.set_volume(new_volume.master)
 
     # Save and reschedule
     await state.settings_repository.save(new_settings)
@@ -360,6 +365,64 @@ async def get_audio_playing_status(
 async def get_adhan_types() -> list[dict[str, str]]:
     """Kullanılabilir ezan türlerini listele."""
     return [{"value": t.value, "label": t.display_name} for t in AdhanType]
+
+
+@router.put("/audio/master-volume", response_model=ApiResponse)
+async def set_master_volume(
+    request: MasterVolumeRequest,
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ApiResponse:
+    """Bluetooth hoparlör master ses seviyesini ayarla ve kaydet."""
+    success = await state.system_volume.set_volume(request.volume)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Sistem ses seviyesi ayarlanamadı. PulseAudio kontrol edin.",
+        )
+
+    # Ayarlara kaydet
+    current = state.settings
+    new_volume = VolumeSettings(
+        master=request.volume,
+        fajr=current.volume.fajr,
+        sunrise=current.volume.sunrise,
+        dhuhr=current.volume.dhuhr,
+        asr=current.volume.asr,
+        maghrib=current.volume.maghrib,
+        isha=current.volume.isha,
+    )
+    new_settings = PrayerSettings(
+        location=current.location,
+        adhan_type=current.adhan_type,
+        offsets=current.offsets,
+        volume=new_volume,
+        enabled_prayers=current.enabled_prayers,
+        pre_alert_minutes=current.pre_alert_minutes,
+        fajr_isha_method=current.fajr_isha_method,
+        asr_fiqh=current.asr_fiqh,
+        bluetooth_device_mac=current.bluetooth_device_mac,
+    )
+    state.settings = new_settings
+    state.adhan_service.update_settings(new_settings)
+    await state.settings_repository.save(new_settings)
+
+    return ApiResponse(
+        success=True,
+        message=f"Master ses seviyesi {request.volume}% olarak ayarlandı.",
+        data={"volume": request.volume},
+    )
+
+
+@router.get("/audio/master-volume")
+async def get_master_volume(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> dict[str, int | None]:
+    """Mevcut sistem ses seviyesini oku."""
+    system_vol = await state.system_volume.get_volume()
+    return {
+        "system_volume": system_vol,
+        "saved_volume": state.settings.volume.master,
+    }
 
 
 # ============== Utility ==============

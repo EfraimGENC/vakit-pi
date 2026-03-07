@@ -10,6 +10,7 @@ from vakit_pi.infrastructure.bluetooth import BluetoothctlAdapter
 from vakit_pi.infrastructure.event_bus import InMemoryEventBus
 from vakit_pi.infrastructure.scheduler import APSchedulerAdapter
 from vakit_pi.infrastructure.settings_repository import JsonSettingsRepository
+from vakit_pi.infrastructure.system_volume import PulseAudioVolumeAdapter
 from vakit_pi.services.adhan_service import AdhanService
 from vakit_pi.services.prayer_service import PrayerService
 from vakit_pi.services.scheduler_service import SchedulerService
@@ -28,6 +29,7 @@ class AppState:
     event_bus: InMemoryEventBus
     audio_player: BaseAudioPlayer
     bluetooth_adapter: BluetoothctlAdapter
+    system_volume: PulseAudioVolumeAdapter
     started_at: datetime
     audio_dir: Path
 
@@ -68,6 +70,7 @@ async def initialize_app_state(
     audio_player = get_best_player()
     scheduler_adapter = APSchedulerAdapter()
     bluetooth_adapter = BluetoothctlAdapter()
+    system_volume = PulseAudioVolumeAdapter()
 
     # Services
     prayer_service = PrayerService(
@@ -101,6 +104,7 @@ async def initialize_app_state(
         event_bus=event_bus,
         audio_player=audio_player,
         bluetooth_adapter=bluetooth_adapter,
+        system_volume=system_volume,
         started_at=datetime.now(),
         audio_dir=audio_dir,
     )

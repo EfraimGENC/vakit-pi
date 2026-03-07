@@ -30,13 +30,13 @@ class PrayerOffsetsSchema(BaseModel):
 class VolumeSettingsSchema(BaseModel):
     """Ses seviyesi ayarları şeması."""
 
-    default: Annotated[int, Field(ge=0, le=100, default=80)]
-    fajr: Annotated[int | None, Field(ge=0, le=100, default=None)]
-    sunrise: Annotated[int | None, Field(ge=0, le=100, default=None)]
-    dhuhr: Annotated[int | None, Field(ge=0, le=100, default=None)]
-    asr: Annotated[int | None, Field(ge=0, le=100, default=None)]
-    maghrib: Annotated[int | None, Field(ge=0, le=100, default=None)]
-    isha: Annotated[int | None, Field(ge=0, le=100, default=None)]
+    master: Annotated[int, Field(ge=0, le=100, default=80)]
+    fajr: Annotated[int, Field(ge=0, le=100, default=100)]
+    sunrise: Annotated[int, Field(ge=0, le=100, default=100)]
+    dhuhr: Annotated[int, Field(ge=0, le=100, default=100)]
+    asr: Annotated[int, Field(ge=0, le=100, default=100)]
+    maghrib: Annotated[int, Field(ge=0, le=100, default=100)]
+    isha: Annotated[int, Field(ge=0, le=100, default=100)]
 
 
 class SettingsSchema(BaseModel):
@@ -149,6 +149,12 @@ class BluetoothConnectRequest(BaseModel):
         description="Bağlanılacak cihazın MAC adresi",
         pattern=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$",
     )
+
+
+class MasterVolumeRequest(BaseModel):
+    """Master ses seviyesi ayarlama isteği."""
+
+    volume: Annotated[int, Field(ge=0, le=100, description="Bluetooth hoparlör ses seviyesi")]
 
 
 class ApiResponse(BaseModel):

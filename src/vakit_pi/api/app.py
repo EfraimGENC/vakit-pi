@@ -96,6 +96,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         _bt_connect_task = asyncio.create_task(state.bluetooth_adapter.auto_connect_loop(bt_mac))
         logger.info(f"Bluetooth auto-connect başlatıldı: {bt_mac}")
 
+    # Kayıtlı master ses seviyesini sistem seviyesine uygula
+    master_vol = state.settings.volume.master
+    await state.system_volume.set_volume(master_vol)
+    logger.info(f"Master ses seviyesi uygulandı: {master_vol}%")
+
     logger.info("Vakit-Pi hazır!")
 
     yield
