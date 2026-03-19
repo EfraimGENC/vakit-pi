@@ -47,6 +47,33 @@ Vakite özel dosya bulunamazsa varsayılan dosya çalınır.
 | Akşam   | `adhan_madinah_aksam.mp3`    |
 | Yatsı   | `adhan_madinah_yatsi.mp3`    |
 
+## Müezzin Varyantları (Opsiyonel)
+
+Aynı stil ve vakit için birden fazla ezan dosyası eklenebilir. Sistem bu dosyalar
+arasından rastgele seçim yapar.
+
+**Format:** `adhan_{ezan_tipi}_{vakit}_{varyant}.mp3`
+
+### Örnek
+
+```
+adhan_istanbul_ikindi.mp3
+adhan_istanbul_ikindi_ahmet.mp3
+adhan_istanbul_ikindi_mehmet_hoca.mp3
+adhan_istanbul_ikindi_müezzin_ali.mp3
+```
+
+Bu durumda "istanbul" stilinde "ikindi" vaktinde ezan çalınacağı zaman,
+yukarıdaki dört dosyadan biri rastgele seçilir.
+
+Varyant adı serbesttir ve alt çizgi içerebilir. Vakite özel dosya olmadan
+da sadece varsayılan dosya için varyant eklenebilir:
+
+```
+adhan_istanbul.mp3
+adhan_istanbul_hafız_mehmet.mp3
+```
+
 ## Dosya Kaynakları
 
 Ezan ses dosyalarını yasal kaynaklardan temin edebilirsiniz:

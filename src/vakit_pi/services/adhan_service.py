@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import random
 from pathlib import Path
 
 from vakit_pi.domain.events import (
@@ -49,6 +50,37 @@ class AdhanService:
         """Ayarları güncelle."""
         self._settings = settings
 
+    def _find_audio_candidates(
+        self, base_name: str, *, exclude_prayer_suffixes: bool = False
+    ) -> list[Path]:
+        """
+        Verilen base_name ile eşleşen tüm ses dosyalarını bul.
+
+        Hem tam eşleşme (base_name.mp3) hem de varyant dosyalarını (base_name_*.mp3) bulur.
+
+        Args:
+            base_name: Dosya adı tabanı (örn: "adhan_istanbul_ikindi")
+            exclude_prayer_suffixes: True ise vakite özel dosyaları hariç tut
+                (varsayılan varyantları ararken kullanılır)
+        """
+        candidates: list[Path] = []
+
+        exact = self._audio_dir / f"{base_name}.mp3"
+        if exact.exists():
+            candidates.append(exact)
+
+        prayer_values = {p.value for p in PrayerName}
+
+        for path in sorted(self._audio_dir.glob(f"{base_name}_*.mp3")):
+            if exclude_prayer_suffixes:
+                suffix = path.stem[len(base_name) + 1 :]
+                first_part = suffix.split("_")[0]
+                if first_part in prayer_values:
+                    continue
+            candidates.append(path)
+
+        return candidates
+
     def get_adhan_path(
         self, adhan_type: AdhanType | None = None, prayer: PrayerName | None = None
     ) -> Path:
@@ -57,6 +89,10 @@ class AdhanService:
 
         Önce vakite özel dosya aranır (örn: adhan_istanbul_ogle.mp3),
         bulunamazsa varsayılan dosya döndürülür (örn: adhan_istanbul.mp3).
+
+        Aynı stil ve vakit için birden fazla dosya varsa rastgele seçim yapılır.
+        Örn: adhan_istanbul_ikindi.mp3, adhan_istanbul_ikindi_ahmet.mp3,
+        adhan_istanbul_ikindi_mehmet_hoca.mp3 arasından rastgele biri seçilir.
 
         Args:
             adhan_type: Ezan türü (None ise ayarlardan alınır)
@@ -70,13 +106,24 @@ class AdhanService:
 
         # Vakite özel dosya kontrolü
         if prayer is not None:
-            prayer_specific_filename = f"adhan_{adhan_type.value}_{prayer.value}.mp3"
-            prayer_specific_path = self._audio_dir / prayer_specific_filename
-            if prayer_specific_path.exists():
-                logger.debug(f"Vakite özel ezan dosyası bulundu: {prayer_specific_filename}")
-                return prayer_specific_path
+            base_name = f"adhan_{adhan_type.value}_{prayer.value}"
+            candidates = self._find_audio_candidates(base_name)
+            if candidates:
+                selected = random.choice(candidates)
+                logger.debug(f"Ezan dosyası seçildi: {selected.name} ({len(candidates)} seçenek)")
+                return selected
 
-        # Varsayılan dosya
+        # Varsayılan dosya (vakite özel bulunamadıysa veya prayer=None ise)
+        base_name = f"adhan_{adhan_type.value}"
+        candidates = self._find_audio_candidates(base_name, exclude_prayer_suffixes=True)
+        if candidates:
+            selected = random.choice(candidates)
+            logger.debug(
+                f"Varsayılan ezan dosyası seçildi: {selected.name} ({len(candidates)} seçenek)"
+            )
+            return selected
+
+        # Son çare: varsayılan dosya yolu (var olmasa bile)
         return self._audio_dir / adhan_type.filename
 
     async def play_adhan(self, prayer: PrayerName) -> None:
