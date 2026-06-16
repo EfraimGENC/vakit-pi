@@ -138,45 +138,44 @@
       </div>
 
       <!-- Main Content -->
-      <div v-else class="min-h-screen pb-20 w-full max-w-xl mx-auto mb-10">
+      <div v-else class="min-h-screen pb-16 w-full max-w-xl mx-auto mb-6">
         <!-- Header -->
-        <div class="text-center pt-8 pb-4 px-4">
-          <p class="text-emerald-400 text-sm">
-            {{ currentState?.location?.city || 'Konum yükleniyor...' }}
-          </p>
-          <h1 class="amiri text-5xl font-bold mt-2">
-            {{ currentState?.current_time || '--:--:--' }}
-          </h1>
-          <p class="text-gray-400 mt-1">
-            {{ currentState?.current_date || '' }}
-          </p>
-          <p class="text-amber-400 text-sm amiri mt-1">
-            {{ currentState?.hijri_date || '' }}
-          </p>
+        <div class="pt-5 pb-3 px-4">
+          <div class="flex items-center justify-between">
+            <p class="text-emerald-400 text-sm font-medium">
+              {{ currentState?.location?.city || 'Konum yükleniyor...' }}
+            </p>
+            <p class="text-gray-300 text-sm tabular-nums">
+              {{ currentState?.current_time || '--:--:--' }}
+            </p>
+          </div>
+          <div class="flex items-center justify-center gap-2 mt-1 text-xs">
+            <span class="text-gray-400">{{ currentState?.current_date || '' }}</span>
+            <span class="text-gray-600">•</span>
+            <span class="text-amber-400 amiri">{{ currentState?.hijri_date || '' }}</span>
+          </div>
         </div>
 
         <!-- Ana Sayfa -->
         <div v-if="currentTab === 'home'" class="px-4">
           <!-- Sonraki Namaz Kartı -->
-          <div class="glass rounded-2xl p-6 mb-6 text-center">
-            <p class="text-gray-400 text-sm">Sonraki Namaz</p>
-            <div class="flex items-center justify-center gap-3 mt-2">
-              <span class="text-3xl"
+          <div class="glass rounded-2xl p-5 mb-4 text-center">
+            <p class="text-gray-400 text-xs uppercase tracking-wide">Sonraki Namaz</p>
+            <div class="flex items-center justify-center gap-2 mt-1">
+              <span class="text-2xl"
                 >{{ getIcon(currentState?.next_prayer) }}</span
               >
               <span class="text-2xl font-semibold"
                 >{{ currentState?.next_prayer_display || '-' }}</span
               >
+              <span class="text-2xl font-bold text-emerald-400"
+                >{{ currentState?.next_prayer_time || '--:--' }}</span
+              >
             </div>
-            <p class="text-4xl font-bold text-emerald-400 mt-2">
-              {{ currentState?.next_prayer_time || '--:--' }}
+            <p class="text-6xl font-mono font-bold text-white mt-3 tabular-nums tracking-tight">
+              {{ currentState?.countdown || '--:--:--' }}
             </p>
-            <div class="mt-4 bg-black/30 rounded-xl py-3 px-4">
-              <p class="text-gray-400 text-xs">Kalan Süre</p>
-              <p class="text-2xl font-mono text-white">
-                {{ currentState?.countdown || '--:--:--' }}
-              </p>
-            </div>
+            <p class="text-gray-400 text-xs mt-1">Kalan Süre</p>
 
             <!-- Ezan Çalıyor Bildirimi ve Durdur Butonu -->
             <div v-if="currentState?.is_adhan_playing" class="mt-4 space-y-3">
@@ -204,29 +203,20 @@
               v-for="prayer in todayTimes?.prayers"
               :key="prayer.name"
               :class="[
-                             'flex items-center justify-between p-4 border-b border-white/5 last:border-0',
+                             'flex items-center justify-between px-4 py-2.5 border-b border-white/5 last:border-0',
                              currentState?.current_prayer === prayer.name ? 'active-prayer bg-emerald-500/10' : ''
                          ]"
             >
-              <div class="flex items-center gap-3">
-                <span class="text-2xl">{{ prayer.icon }}</span>
-                <div>
-                  <p class="font-medium">{{ prayer.display_name }}</p>
-                  <p v-if="prayer.enabled" class="text-xs text-emerald-400">
-                    🔔 Sesli
-                  </p>
-                  <p v-else class="text-xs text-gray-500">🔕 Sessiz</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <p class="text-xl font-semibold">{{ prayer.time }}</p>
-                <p
-                  v-if="currentState?.current_prayer === prayer.name"
-                  class="text-xs text-emerald-400"
+              <div class="flex items-center gap-2.5">
+                <span class="text-lg">{{ prayer.icon }}</span>
+                <span class="font-medium">{{ prayer.display_name }}</span>
+                <span
+                  class="text-xs"
+                  :class="prayer.enabled ? 'text-emerald-400' : 'text-gray-600'"
+                  >{{ prayer.enabled ? '🔔' : '🔕' }}</span
                 >
-                  Şu anki vakit
-                </p>
               </div>
+              <span class="text-lg font-semibold tabular-nums">{{ prayer.time }}</span>
             </div>
           </div>
         </div>
@@ -544,22 +534,22 @@
         <nav
           class="fixed bottom-0 left-0 right-0 glass border-t border-white/10"
         >
-          <div class="flex justify-around py-3">
+          <div class="flex justify-around max-w-xl mx-auto py-2">
             <button
               @click="currentTab = 'home'"
-              :class="['flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition',
+              :class="['flex items-center gap-2 px-5 py-2 rounded-xl transition text-sm',
                                      currentTab === 'home' ? 'text-emerald-400' : 'text-gray-400']"
             >
-              <span class="text-xl">🕌</span>
-              <span class="text-xs">Vakitler</span>
+              <span class="text-base">🕌</span>
+              <span>Vakitler</span>
             </button>
             <button
               @click="currentTab = 'settings'"
-              :class="['flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition',
+              :class="['flex items-center gap-2 px-5 py-2 rounded-xl transition text-sm',
                                      currentTab === 'settings' ? 'text-emerald-400' : 'text-gray-400']"
             >
-              <span class="text-xl">⚙️</span>
-              <span class="text-xs">Ayarlar</span>
+              <span class="text-base">⚙️</span>
+              <span>Ayarlar</span>
             </button>
           </div>
         </nav>
