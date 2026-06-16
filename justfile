@@ -11,6 +11,11 @@ default:
 
 # Sunucuda güncelleme: git pull, sync, restart
 update:
+    # stop, clean, pull, sync, restart, status
+    @echo "🛑 Servis durduruluyor..."
+    @just stop
+    @echo "🧹 Cache dosyaları temizleniyor..."
+    @just clean
     @echo "📥 Güncellemeler çekiliyor..."
     git pull origin main
     @echo "📦 Bağımlılıklar senkronize ediliyor..."
@@ -19,9 +24,6 @@ update:
     sudo systemctl restart vakit-pi
     @echo "✅ Güncelleme tamamlandı!"
     @just status
-
-# Temiz güncelleme: cache temizliği dahil
-clean-update: clean update
 
 # Servisi yeniden başlat
 restart:
