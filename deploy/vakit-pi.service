@@ -30,6 +30,14 @@ Environment="VAKIT_PI_SETTINGS_PATH=/home/efraim/.config/vakit-pi/settings.json"
 # PulseAudio / Bluetooth ses için gerekli (System-wide PulseAudio)
 Environment="PULSE_SERVER=/var/run/pulse/native"
 
+# Anti-gate (Bluetooth hoparlör noise gate'i) — varsayılan AÇIK, ekstra ayar gerekmez.
+# Aşağıdakiler yalnızca ince ayar içindir; satırın başındaki '#' kaldırılıp değer değiştirilir.
+# Environment="VAKIT_PI_ANTIGATE=1"            # 0 → anti-gate kapalı (düz oynatım)
+# Environment="VAKIT_PI_ANTIGATE_LEADIN=1.5"   # lead-in ısıtma tonu süresi (saniye)
+# Environment="VAKIT_PI_ANTIGATE_TONE_HZ=55"   # lead-in / taban ton frekansı (Hz)
+# Environment="VAKIT_PI_ANTIGATE_COMPRESS=1"   # dinamik normalizasyon aç/kapa
+# Environment="VAKIT_PI_ANTIGATE_FLOOR_DB=-48" # taban ton seviyesi (dB); satır kapalıyken taban kapalı
+
 # Bluetooth adaptörünü aç (rfkill soft-block durumunda kalabilir)
 ExecStartPre=+/usr/sbin/rfkill unblock bluetooth
 
