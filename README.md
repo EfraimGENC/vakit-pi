@@ -171,6 +171,7 @@ restart ederek):
 | `VAKIT_PI_ANTIGATE_TONE_HZ` | `55` | Lead-in / taban ton frekansı (Hz) |
 | `VAKIT_PI_ANTIGATE_COMPRESS` | `1` | Dinamik normalizasyon aç/kapa |
 | `VAKIT_PI_ANTIGATE_FLOOR_DB` | `off` | Taban ton seviyesi (ör. `-48`); `off` → kapalı |
+| `VAKIT_PI_ANTIGATE_TAIL` | `2.5` | Çıkışa eklenen dolgu sessizlik (sn); ffmpeg pulse drain etmeden bittiği için sesin sonunun kesilmesini önler |
 
 > `ffmpeg` yoksa veya `VAKIT_PI_ANTIGATE=0` ise mevcut oynatıcı zincirine
 > (`mpg123 → ffplay → paplay → aplay`) düşülür.

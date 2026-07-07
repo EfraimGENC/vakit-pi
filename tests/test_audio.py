@@ -18,6 +18,7 @@ ANTIGATE_ENV_VARS = [
     "VAKIT_PI_ANTIGATE_TONE_HZ",
     "VAKIT_PI_ANTIGATE_COMPRESS",
     "VAKIT_PI_ANTIGATE_FLOOR_DB",
+    "VAKIT_PI_ANTIGATE_TAIL",
 ]
 
 
@@ -40,6 +41,7 @@ class TestAntiGateConfig:
         assert config.tone_hz == 55
         assert config.compress is True
         assert config.floor_db is None
+        assert config.tail_seconds == 2.5
 
     def test_env_overrides(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Ortam değişkenleri varsayılanları ezer."""
@@ -47,6 +49,7 @@ class TestAntiGateConfig:
         monkeypatch.setenv("VAKIT_PI_ANTIGATE_LEADIN", "2.5")
         monkeypatch.setenv("VAKIT_PI_ANTIGATE_TONE_HZ", "40")
         monkeypatch.setenv("VAKIT_PI_ANTIGATE_COMPRESS", "0")
+        monkeypatch.setenv("VAKIT_PI_ANTIGATE_TAIL", "3.0")
 
         config = AntiGateConfig.from_env()
 
@@ -54,6 +57,7 @@ class TestAntiGateConfig:
         assert config.leadin_seconds == 2.5
         assert config.tone_hz == 40
         assert config.compress is False
+        assert config.tail_seconds == 3.0
 
     def test_floor_db_parsed_when_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """FLOOR_DB sayısal verilince float olarak okunur."""
@@ -119,6 +123,25 @@ class TestBuildAntiGateFilter:
         chain = build_antigate_filter(AntiGateConfig(), volume=80)
 
         assert "volume=0.8" in chain
+
+    def test_tail_adds_apad(self) -> None:
+        """Tail > 0 iken çıkışa apad ile dolgu sessizlik eklenir.
+
+        PulseAudio çıkış buffer'ı drain edilmediği için son ~1.5s kesiliyordu;
+        apad dolgusu gerçek içeriğin sonuna kadar çalınmasını garanti eder.
+        """
+        chain = build_antigate_filter(AntiGateConfig(tail_seconds=2.5), volume=100)
+
+        assert "apad=pad_dur=2.5" in chain
+        # apad son aşama olmalı: çıkış etiketi apad'dan gelir
+        assert chain.rstrip().endswith("[out]")
+        assert "apad" in chain.rsplit("[out]", 1)[0].rsplit(";", 1)[-1]
+
+    def test_no_tail_omits_apad(self) -> None:
+        """Tail 0 iken apad eklenmez."""
+        chain = build_antigate_filter(AntiGateConfig(tail_seconds=0.0), volume=100)
+
+        assert "apad" not in chain
 
 
 class TestFfmpegAntiGatePlayer:

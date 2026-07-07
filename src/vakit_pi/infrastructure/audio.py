@@ -34,6 +34,10 @@ class AntiGateConfig:
     tone_hz: int = 55
     compress: bool = True
     floor_db: float | None = None
+    # Çıkışa eklenen dolgu sessizlik (saniye). ffmpeg pulse çıkışı buffer'ı drain
+    # etmeden sonlandığı için son ~1.5s kesiliyor; bu dolgu içeriğin tamamının
+    # çalınmasını garanti eder. PulseAudio latency'sinden büyük olmalı.
+    tail_seconds: float = 2.5
 
     @classmethod
     def from_env(cls) -> "AntiGateConfig":
@@ -47,6 +51,7 @@ class AntiGateConfig:
             tone_hz=int(os.getenv("VAKIT_PI_ANTIGATE_TONE_HZ", "55")),
             compress=_env_bool("VAKIT_PI_ANTIGATE_COMPRESS", True),
             floor_db=floor_db,
+            tail_seconds=float(os.getenv("VAKIT_PI_ANTIGATE_TAIL", "2.5")),
         )
 
 
@@ -60,7 +65,7 @@ _AUDIO_FORMAT = "aformat=sample_fmts=fltp:channel_layouts=stereo"
 def build_antigate_filter(config: AntiGateConfig, volume: int) -> str:
     """ffmpeg filter_complex zincirini kur.
 
-    Zincir üç bileşenden oluşur; hiçbiri toplam süre bilgisi gerektirmez, böylece
+    Zincir dört bileşenden oluşur; hiçbiri toplam süre bilgisi gerektirmez, böylece
     hem statik dosya hem canlı TTS stream'i için aynı filtre kullanılabilir:
 
     1. Lead-in ısıtma tonu (asıl sesin önüne concat) → gate/Bluetooth linki ilk
@@ -68,6 +73,8 @@ def build_antigate_filter(config: AntiGateConfig, volume: int) -> str:
     2. Dinamik normalizasyon (dynaudnorm) → yumuşak kısımlar yükselir, ortadaki
        kelime başları gate eşiğinin üstünde kalır.
     3. Opsiyonel taban tonu (amix) → nefes anlarında gate tam kapanmaz.
+    4. Tail dolgu (apad) → ffmpeg pulse çıkışı buffer'ı drain etmeden sonlandığı
+       için son ~1.5s kesiliyordu; dolgu sessizlik içeriğin tamamını korur.
 
     Çıkış etiketi her zaman ``[out]``.
     """
@@ -76,31 +83,40 @@ def build_antigate_filter(config: AntiGateConfig, volume: int) -> str:
     main = f"[0:a]aresample=48000,{_AUDIO_FORMAT}"
     if config.compress:
         main += ",dynaudnorm"
-    main += f",volume={gain:g}"
+    main += f",volume={gain:g}[main]"
 
     parts: list[str] = []
 
+    # 1. Lead-in ısıtma tonu + ana ses → [body]
     if config.leadin_seconds > 0:
         parts.append(
             f"sine=frequency={config.tone_hz}:duration={config.leadin_seconds:g}"
             f":sample_rate=48000,{_AUDIO_FORMAT},volume={_LEADIN_GAIN:g},"
             f"afade=t=in:d=0.25[lead]"
         )
-        parts.append(f"{main}[main]")
-        concat_out = "[cc]" if config.floor_db is not None else "[out]"
-        parts.append(f"[lead][main]concat=n=2:v=0:a=1{concat_out}")
-        stage_label = concat_out
+        parts.append(main)
+        parts.append("[lead][main]concat=n=2:v=0:a=1[body]")
+        body = "[body]"
     else:
-        main_out = "[main]" if config.floor_db is not None else "[out]"
-        parts.append(f"{main}{main_out}")
-        stage_label = main_out
+        parts.append(main)
+        body = "[main]"
 
+    # 2. Opsiyonel taban tonu → [mixed]
     if config.floor_db is not None:
         parts.append(
             f"sine=frequency={config.tone_hz}:sample_rate=48000,"
             f"{_AUDIO_FORMAT},volume={config.floor_db:g}dB[floor]"
         )
-        parts.append(f"{stage_label}[floor]amix=inputs=2:duration=first:normalize=0[out]")
+        parts.append(f"{body}[floor]amix=inputs=2:duration=first:normalize=0[mixed]")
+        mixed = "[mixed]"
+    else:
+        mixed = body
+
+    # 3. Tail dolgu (drain telafisi) → [out]
+    if config.tail_seconds > 0:
+        parts.append(f"{mixed}apad=pad_dur={config.tail_seconds:g}[out]")
+    else:
+        parts.append(f"{mixed}anull[out]")
 
     return ";".join(parts)
 
