@@ -152,30 +152,6 @@ Ayarlar `~/.config/vakit-pi/settings.json` dosyasında saklanır:
 | `VAKIT_PI_LOG_LEVEL` | `INFO` | Log seviyesi |
 | `VAKIT_PI_SETTINGS_PATH` | `~/.config/vakit-pi/settings.json` | Ayar dosyası yolu |
 
-### Anti-Gate (Bluetooth hoparlör noise gate'i)
-
-Bazı Bluetooth hoparlörler (ör. Behringer C210) bir noise gate içerir; sinyal
-kısılınca kapanır ve tekrar açılırken sesin başındaki/ortasındaki yumuşak heceleri
-kırpar (ör. "Hayyalesselah" → "ayyalesselah"). `ffmpeg` mevcutsa oynatım, gate'i
-oynatım süresince açık tutan bir filtreden (lead-in ısıtma tonu + dinamik
-normalizasyon + opsiyonel taban tonu) geçirilir. Ses yalnızca oynatım sırasında
-üretilir; oynatım bitince tam sessizliğe dönülür.
-
-Behringer'ın eşiği bilinmediğinden parametreler denenerek ayarlanır (servisi
-restart ederek):
-
-| Değişken | Varsayılan | Açıklama |
-|----------|-----------|----------|
-| `VAKIT_PI_ANTIGATE` | `1` | Anti-gate aç/kapa (`0` → düz oynatım, filtresiz) |
-| `VAKIT_PI_ANTIGATE_LEADIN` | `1.5` | Lead-in ısıtma tonu süresi (saniye) |
-| `VAKIT_PI_ANTIGATE_TONE_HZ` | `55` | Lead-in / taban ton frekansı (Hz) |
-| `VAKIT_PI_ANTIGATE_COMPRESS` | `1` | Dinamik normalizasyon aç/kapa |
-| `VAKIT_PI_ANTIGATE_FLOOR_DB` | `off` | Taban ton seviyesi (ör. `-48`); `off` → kapalı |
-| `VAKIT_PI_ANTIGATE_TAIL` | `2.5` | Çıkışa eklenen dolgu sessizlik (sn); ffmpeg pulse drain etmeden bittiği için sesin sonunun kesilmesini önler |
-
-> `ffmpeg` yoksa veya `VAKIT_PI_ANTIGATE=0` ise mevcut oynatıcı zincirine
-> (`mpg123 → ffplay → paplay → aplay`) düşülür.
-
 ## API Endpoints
 
 | Method | Endpoint | Açıklama |

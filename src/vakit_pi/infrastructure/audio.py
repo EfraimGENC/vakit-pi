@@ -2,123 +2,13 @@
 
 import asyncio
 import logging
-import os
 import shutil
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
 
 from vakit_pi.services.ports import AudioPlayerPort
 
 logger = logging.getLogger(__name__)
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    """Ortam değişkenini boolean olarak oku."""
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in ("1", "true", "yes", "on")
-
-
-@dataclass(frozen=True)
-class AntiGateConfig:
-    """Behringer noise gate'ini oynatım sırasında açık tutan işleme ayarları.
-
-    Parametreler ortam değişkenleriyle ayarlanır; Behringer'ın eşiği bilinmediğinden
-    Pi'de deneyerek ince ayar yapılır.
-    """
-
-    enabled: bool = True
-    leadin_seconds: float = 1.5
-    tone_hz: int = 55
-    compress: bool = True
-    floor_db: float | None = None
-    # Çıkışa eklenen dolgu sessizlik (saniye). ffmpeg pulse çıkışı buffer'ı drain
-    # etmeden sonlandığı için son ~1.5s kesiliyor; bu dolgu içeriğin tamamının
-    # çalınmasını garanti eder. PulseAudio latency'sinden büyük olmalı.
-    tail_seconds: float = 2.5
-
-    @classmethod
-    def from_env(cls) -> "AntiGateConfig":
-        """Ortam değişkenlerinden yapılandırma yükle."""
-        floor_raw = os.getenv("VAKIT_PI_ANTIGATE_FLOOR_DB", "off").strip().lower()
-        floor_db = None if floor_raw in ("", "off", "none") else float(floor_raw)
-
-        return cls(
-            enabled=_env_bool("VAKIT_PI_ANTIGATE", True),
-            leadin_seconds=float(os.getenv("VAKIT_PI_ANTIGATE_LEADIN", "1.5")),
-            tone_hz=int(os.getenv("VAKIT_PI_ANTIGATE_TONE_HZ", "55")),
-            compress=_env_bool("VAKIT_PI_ANTIGATE_COMPRESS", True),
-            floor_db=floor_db,
-            tail_seconds=float(os.getenv("VAKIT_PI_ANTIGATE_TAIL", "2.5")),
-        )
-
-
-# Lead-in ısıtma tonunun tepe seviyesi (lineer). Gate'i açacak kadar var,
-# ezandan önce rahatsız etmeyecek kadar kısık.
-_LEADIN_GAIN = 0.2
-# concat/amix'in aynı formatta stream beklemesi için ortak ses formatı.
-_AUDIO_FORMAT = "aformat=sample_fmts=fltp:channel_layouts=stereo"
-
-
-def build_antigate_filter(config: AntiGateConfig, volume: int) -> str:
-    """ffmpeg filter_complex zincirini kur.
-
-    Zincir dört bileşenden oluşur; hiçbiri toplam süre bilgisi gerektirmez, böylece
-    hem statik dosya hem canlı TTS stream'i için aynı filtre kullanılabilir:
-
-    1. Lead-in ısıtma tonu (asıl sesin önüne concat) → gate/Bluetooth linki ilk
-       hece gelmeden açılır.
-    2. Dinamik normalizasyon (dynaudnorm) → yumuşak kısımlar yükselir, ortadaki
-       kelime başları gate eşiğinin üstünde kalır.
-    3. Opsiyonel taban tonu (amix) → nefes anlarında gate tam kapanmaz.
-    4. Tail dolgu (apad) → ffmpeg pulse çıkışı buffer'ı drain etmeden sonlandığı
-       için son ~1.5s kesiliyordu; dolgu sessizlik içeriğin tamamını korur.
-
-    Çıkış etiketi her zaman ``[out]``.
-    """
-    gain = max(0.0, min(volume, 100)) / 100
-
-    main = f"[0:a]aresample=48000,{_AUDIO_FORMAT}"
-    if config.compress:
-        main += ",dynaudnorm"
-    main += f",volume={gain:g}[main]"
-
-    parts: list[str] = []
-
-    # 1. Lead-in ısıtma tonu + ana ses → [body]
-    if config.leadin_seconds > 0:
-        parts.append(
-            f"sine=frequency={config.tone_hz}:duration={config.leadin_seconds:g}"
-            f":sample_rate=48000,{_AUDIO_FORMAT},volume={_LEADIN_GAIN:g},"
-            f"afade=t=in:d=0.25[lead]"
-        )
-        parts.append(main)
-        parts.append("[lead][main]concat=n=2:v=0:a=1[body]")
-        body = "[body]"
-    else:
-        parts.append(main)
-        body = "[main]"
-
-    # 2. Opsiyonel taban tonu → [mixed]
-    if config.floor_db is not None:
-        parts.append(
-            f"sine=frequency={config.tone_hz}:sample_rate=48000,"
-            f"{_AUDIO_FORMAT},volume={config.floor_db:g}dB[floor]"
-        )
-        parts.append(f"{body}[floor]amix=inputs=2:duration=first:normalize=0[mixed]")
-        mixed = "[mixed]"
-    else:
-        mixed = body
-
-    # 3. Tail dolgu (drain telafisi) → [out]
-    if config.tail_seconds > 0:
-        parts.append(f"{mixed}apad=pad_dur={config.tail_seconds:g}[out]")
-    else:
-        parts.append(f"{mixed}anull[out]")
-
-    return ";".join(parts)
 
 
 class BaseAudioPlayer(AudioPlayerPort, ABC):
@@ -173,7 +63,9 @@ class BaseAudioPlayer(AudioPlayerPort, ABC):
 
         if self._process.returncode != 0:
             error_msg = stderr.decode().strip() if stderr else ""
-            logger.warning(f"Player çıkış kodu: {self._process.returncode}, hata: {error_msg}")
+            logger.warning(
+                f"Player çıkış kodu: {self._process.returncode}, hata: {error_msg}"
+            )
 
         self._process = None
 
@@ -200,47 +92,6 @@ class BaseAudioPlayer(AudioPlayerPort, ABC):
         if not 0 <= volume <= 100:
             raise ValueError(f"Geçersiz ses seviyesi: {volume}")
         self._current_volume = volume
-
-
-class FfmpegAntiGatePlayer(BaseAudioPlayer):
-    """ffmpeg ile anti-gate işleme uygulayarak PulseAudio'ya (Bluetooth) çalar.
-
-    Lead-in ısıtma tonu + dinamik normalizasyon + opsiyonel taban tonu ile Behringer
-    noise gate'ini oynatım süresince açık tutar. Oynatım bitince tam sessizliğe döner.
-    """
-
-    def __init__(self, config: AntiGateConfig | None = None) -> None:
-        super().__init__()
-        self._config = config or AntiGateConfig.from_env()
-
-    def _is_available(self) -> bool:
-        """ffmpeg kurulu mu?"""
-        return shutil.which("ffmpeg") is not None
-
-    def _get_command(self, file_path: str, volume: int) -> list[str]:
-        """ffmpeg komutu oluştur.
-
-        file_path '-' ise ffmpeg stdin'den (pipe:0) okur — TTS stream'i için.
-        """
-        chain = build_antigate_filter(self._config, volume)
-        input_arg = "pipe:0" if file_path == "-" else file_path
-
-        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
-        if input_arg != "pipe:0":
-            # Dosya oynatımında ffmpeg'in klavye stdin'ini yutmasını engelle.
-            cmd.append("-nostdin")
-        cmd += [
-            "-i",
-            input_arg,
-            "-filter_complex",
-            chain,
-            "-map",
-            "[out]",
-            "-f",
-            "pulse",
-            "default",
-        ]
-        return cmd
 
 
 class Mpg123Player(BaseAudioPlayer):
@@ -334,18 +185,8 @@ class PulseAudioPlayer(BaseAudioPlayer):
         ]
 
 
-def get_best_player(antigate: AntiGateConfig | None = None) -> BaseAudioPlayer:
-    """Sistemde mevcut en iyi player'ı döndür.
-
-    ffmpeg mevcut ve anti-gate açıksa Behringer noise gate'ini aşan
-    FfmpegAntiGatePlayer tercih edilir; aksi halde mevcut oynatıcı zincirine düşülür.
-    """
-    antigate = antigate or AntiGateConfig.from_env()
-
-    if antigate.enabled and shutil.which("ffmpeg") is not None:
-        logger.info("Ses oynatıcı seçildi: ffmpeg (anti-gate)")
-        return FfmpegAntiGatePlayer(antigate)
-
+def get_best_player() -> BaseAudioPlayer:
+    """Sistemde mevcut en iyi player'ı döndür."""
     players: list[tuple[str, type[BaseAudioPlayer]]] = [
         ("mpg123", Mpg123Player),  # MP3 için en iyi
         ("ffplay", FfplayPlayer),  # Çok formatlı
@@ -363,39 +204,16 @@ def get_best_player(antigate: AntiGateConfig | None = None) -> BaseAudioPlayer:
     )
 
 
-def build_tts_command(antigate: AntiGateConfig | None = None) -> list[str] | None:
-    """TTS stream'ini (mp3, stdin'den) oynatacak komutu döndür.
-
-    Anti-gate açık ve ffmpeg mevcutsa TTS de anti-gate filtresinden geçer; aksi
-    halde mpg123'e düşülür. Hiçbiri yoksa None.
-    """
-    antigate = antigate or AntiGateConfig.from_env()
-
-    if antigate.enabled and shutil.which("ffmpeg") is not None:
-        return FfmpegAntiGatePlayer(antigate)._get_command("-", volume=100)
-
-    if shutil.which("mpg123") is not None:
-        return ["mpg123", "-q", "-"]
-
-    return None
-
-
-async def speak_tts(
-    text: str,
-    voice: str = "tr-TR-AhmetNeural",
-    antigate: AntiGateConfig | None = None,
-) -> None:
+async def speak_tts(text: str, voice: str = "tr-TR-AhmetNeural") -> None:
     """
     edge-tts kullanarak metni sesli oku.
 
     Args:
         text: Okunacak metin
         voice: Kullanılacak ses (varsayılan: tr-TR-AhmetNeural)
-        antigate: Anti-gate yapılandırması (None ise ortamdan yüklenir)
     """
-    cmd = build_tts_command(antigate)
-    if cmd is None:
-        logger.warning("TTS için ffmpeg veya mpg123 gerekli")
+    if shutil.which("mpg123") is None:
+        logger.warning("TTS için mpg123 gerekli")
         return
 
     try:
@@ -409,9 +227,9 @@ async def speak_tts(
     try:
         communicate = edge_tts.Communicate(text, voice)
 
-        # edge-tts'den gelen audio'yu oynatıcıya pipe et (anti-gate ffmpeg veya mpg123)
+        # edge-tts'den gelen audio'yu mpg123'e pipe et
         process = await asyncio.create_subprocess_exec(
-            *cmd,
+            "mpg123", "-q", "-",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
