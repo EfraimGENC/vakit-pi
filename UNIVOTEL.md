@@ -13,3 +13,6 @@ Eğer incelemediyseniz en yakın zamanda incelemenizi, zamanınız yoksa Claude 
 -Univotel Ekibi
 
 Ekstra not: univotel.com'a mobil UI/UX tarafında güncellemeler getirdik, vaktiniz olursa feedbacklerinizi bekleriz :)
+
+Emre Sefa iletişim numarası 0544 554 83 44
+Emre Sefa email emre@univotel.com
