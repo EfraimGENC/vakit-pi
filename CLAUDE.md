@@ -88,6 +88,6 @@ Persisted to `~/.config/vakit-pi/settings.json`. Key environment variables:
 
 ## Deployment Target
 
-- SSH: `ssh efraim@192.168.1.22`
+- SSH: `ssh <pi-kullanıcı>@<raspberry-pi-ip>` (gerçek kullanıcı/IP'yi repoya yazmayın)
 - Project directory: `~/vakit-pi`
 - Service: `vakit-pi.service` (systemd)

@@ -111,7 +111,7 @@ just typecheck
 
 ### Hedef Cihaz
 
-- **SSH Bağlantısı**: `ssh efraim@192.168.1.22`
+- **SSH Bağlantısı**: `ssh <pi-kullanıcı>@<raspberry-pi-ip>`
 - **OS**: Raspberry Pi OS Debian Bookworm 64-Bit
 - **Proje Dizini**: `~/vakit-pi` (git clone ile)
 
@@ -119,7 +119,7 @@ just typecheck
 
 ```bash
 # SSH ile bağlan
-ssh efraim@192.168.1.22
+ssh <pi-kullanıcı>@<raspberry-pi-ip>
 
 # Proje dizinine git
 cd ~/vakit-pi
@@ -161,7 +161,7 @@ Raspberry Pi üzerinde logları kontrol etmek için:
 
 ```bash
 # SSH bağlantısı
-ssh efraim@192.168.1.22
+ssh <pi-kullanıcı>@<raspberry-pi-ip>
 
 # Canlı log takibi
 sudo journalctl -u vakit-pi -f
@@ -177,11 +177,20 @@ sudo journalctl -u vakit-pi -p err
 
 | Değişken | Varsayılan | Açıklama |
 |----------|------------|----------|
-| `VAKIT_PI_HOST` | `0.0.0.0` | Sunucu host adresi |
+| `VAKIT_PI_HOST` | `0.0.0.0` | Sunucu host adresi (yalnızca localhost için `127.0.0.1`) |
 | `VAKIT_PI_PORT` | `8080` | Sunucu portu |
 | `VAKIT_PI_LOG_LEVEL` | `INFO` | Log seviyesi |
 | `VAKIT_PI_SETTINGS_PATH` | `~/.config/vakit-pi/settings.json` | Ayarlar dosyası |
 | `VAKIT_PI_AUDIO_DIR` | `src/vakit_pi/assets/audio/` | Ses dosyaları dizini |
+| `VAKIT_PI_LAT` | `41.0082` (mock) | Varsayılan konum enlemi |
+| `VAKIT_PI_LNG` | `28.9784` (mock) | Varsayılan konum boylamı |
+| `VAKIT_PI_CITY` | `İstanbul` (mock) | Varsayılan şehir adı |
+| `VAKIT_PI_BT_MAC` | — | Bluetooth hoparlör MAC adresi (placeholder → yok sayılır) |
+
+> **Gizli/kişisel ayarlar:** Gerçek konum, Bluetooth MAC ve host bilgileri kaynak
+> koda gömülmez. Yerel `.env` dosyasından (bkz. `.env.example` mock şablonu) veya
+> systemd `EnvironmentFile` üzerinden okunur. `.env` ve `vakit-pi.env` dosyaları
+> `.gitignore` ile hariç tutulur; **asla commit edilmez**.
 
 ## CLI Komutları
 
@@ -218,8 +227,15 @@ uv run vakit-pi test-audio --volume 80
 
 - Ses dosyaları `.mp3` formatında `assets/audio/` altında bulunur
 - Ayarlar JSON formatında `~/.config/vakit-pi/settings.json` dosyasında saklanır
-- API authentication yok (yerel ağ kullanımı için tasarlandı)
-- Raspberry Pi'ye SSH erişimi parola korumalı
+- Kişisel/gizli değerler (konum, Bluetooth MAC, iç IP, kullanıcı adı) **kaynak koda
+  ve dokümana yazılmaz**; yerel `.env` / `vakit-pi.env` veya `settings.json` içinde
+  tutulur (hepsi `.gitignore` kapsamında). Repoda yalnızca `.env.example` mock şablonu bulunur.
+- **API authentication yok**: Uygulama `0.0.0.0`'a bağlıysa yerel ağdaki herkes
+  ayarları (konum dahil) okuyup değiştirebilir. Güvenli kullanım için `VAKIT_PI_HOST=127.0.0.1`
+  tercih edin ya da güvenlik duvarı / ters proxy / kimlik doğrulama ekleyin. 8080 portunu
+  internete (router port-forward) **açmayın**.
+- Raspberry Pi'ye SSH erişimi parola/anahtar ile korunmalı; kullanıcı adı ve iç IP
+  gizli tutulmalıdır.
 
 ## Sık Karşılaşılan Sorunlar
 

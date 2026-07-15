@@ -1,5 +1,7 @@
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -130,12 +132,32 @@ class PrayerTimeCalculator:
         ]
 
 
+def _load_env_file(path: Path) -> None:
+    """Basit `.env` yükleyici (harici bağımlılık gerektirmez).
+
+    Zaten tanımlı ortam değişkenlerinin üzerine yazmaz.
+    """
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
 # Kullanım
 if __name__ == "__main__":
+    # Konum kaynak koda gömülmez: repo kökündeki `.env` dosyasından ya da
+    # ortam değişkenlerinden (VAKIT_PI_LAT/LNG) okunur. Tanımlı değilse
+    # mock/placeholder İstanbul şehir merkezi koordinatları kullanılır.
+    _load_env_file(Path(__file__).resolve().parents[1] / ".env")
+    latitude = float(os.getenv("VAKIT_PI_LAT", "41.0082"))
+    longitude = float(os.getenv("VAKIT_PI_LNG", "28.9784"))
+
     # Türkiye'de -> otomatik DIYANET_OFFSETS
-    calc = PrayerTimeCalculator(
-        latitude=41.17884530097103, longitude=28.884060058956717
-    )
+    calc = PrayerTimeCalculator(latitude=latitude, longitude=longitude)
 
     print(f"Türkiye'de mi: {calc.is_in_turkey}")  # True
     print(f"Uygulanan offset: {calc.offsets}")  # DIYANET_OFFSETS

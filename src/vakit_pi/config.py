@@ -22,6 +22,31 @@ def _get_default_static_dir() -> Path:
     return Path(__file__).parent / "web"
 
 
+# Konum için mock/placeholder varsayılanlar (İstanbul şehir merkezi).
+# Gerçek konum ortam değişkeni (VAKIT_PI_LAT/LNG/CITY) veya
+# ~/.config/vakit-pi/settings.json üzerinden gelir; kaynak koda yazılmaz.
+DEFAULT_LATITUDE = 41.0082
+DEFAULT_LONGITUDE = 28.9784
+DEFAULT_CITY = "İstanbul"
+
+
+def get_default_location() -> tuple[float, float, str]:
+    """Varsayılan konumu ortam değişkenlerinden al (yoksa mock placeholder)."""
+    latitude = float(os.getenv("VAKIT_PI_LAT", str(DEFAULT_LATITUDE)))
+    longitude = float(os.getenv("VAKIT_PI_LNG", str(DEFAULT_LONGITUDE)))
+    city = os.getenv("VAKIT_PI_CITY", DEFAULT_CITY)
+    return latitude, longitude, city
+
+
+def get_default_bluetooth_mac() -> str | None:
+    """Varsayılan Bluetooth MAC'i ortamdan al; boş/placeholder ise None döndür."""
+    mac = os.getenv("VAKIT_PI_BT_MAC", "").strip()
+    # "XX:XX:.." gibi placeholder değerleri "MAC yok" olarak yorumla.
+    if not mac or set(mac.upper()) <= {"X", ":", "_", "-"}:
+        return None
+    return mac
+
+
 @dataclass
 class AppConfig:
     """Application configuration."""

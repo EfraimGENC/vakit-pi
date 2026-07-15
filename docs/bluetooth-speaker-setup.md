@@ -19,7 +19,7 @@ Bu rehber, Raspberry Pi 4 (Bookworm Lite) üzerinde SSH veya kullanıcı oturumu
 bluetoothctl devices
 
 # Cihazı güvenilir yap (MAC adresini değiştir)
-bluetoothctl trust 41:42:86:EF:B4:62
+bluetoothctl trust XX:XX:XX:XX:XX:XX
 ```
 
 ---
@@ -55,7 +55,7 @@ En alta ekle:
 ```
 load-module module-bluetooth-policy
 load-module module-bluetooth-discover
-set-default-sink bluez_sink.41_42_86_EF_B4_62.a2dp_sink
+set-default-sink bluez_sink.XX_XX_XX_XX_XX_XX.a2dp_sink
 ```
 
 > **Not:** MAC adresindeki `:` karakterleri `_` ile değiştirilir.
@@ -101,7 +101,7 @@ sudo nano /usr/local/bin/bluetooth-autoconnect.sh
 ```bash
 #!/bin/bash
 
-MAC="41:42:86:EF:B4:62"
+MAC="XX:XX:XX:XX:XX:XX"
 
 while true; do
     if ! bluetoothctl info $MAC | grep -q "Connected: yes"; then
@@ -169,7 +169,7 @@ Reboot sonrası SSH **bağlanmadan** hoparlörden bağlantı sesini bekle.
 
 ```bash
 # Bluetooth bağlantı durumu
-bluetoothctl info 41:42:86:EF:B4:62 | grep Connected
+bluetoothctl info XX:XX:XX:XX:XX:XX | grep Connected
 
 # Servis durumları
 systemctl status bluetooth-autoconnect.service
@@ -186,7 +186,7 @@ PULSE_SERVER=/var/run/pulse/native pactl list sinks short
 PULSE_SERVER=/var/run/pulse/native paplay /usr/share/sounds/alsa/Front_Center.wav
 
 # Manuel bağlantı
-bluetoothctl connect 41:42:86:EF:B4:62
+bluetoothctl connect XX:XX:XX:XX:XX:XX
 ```
 
 ---

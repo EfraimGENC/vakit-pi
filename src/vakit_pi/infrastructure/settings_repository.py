@@ -7,6 +7,7 @@ from pathlib import Path
 import aiofiles
 import aiofiles.os
 
+from vakit_pi.config import get_default_bluetooth_mac, get_default_location
 from vakit_pi.domain.models import Location, PrayerSettings
 from vakit_pi.services.ports import SettingsRepositoryPort
 
@@ -72,13 +73,21 @@ class JsonSettingsRepository(SettingsRepositoryPort):
             raise
 
     def _get_default_settings(self) -> PrayerSettings:
-        """Varsayılan ayarlar."""
+        """
+        Varsayılan ayarlar.
+
+        Konum ve Bluetooth MAC değerleri kaynak koda gömülmez; ortam
+        değişkenlerinden (VAKIT_PI_LAT/LNG/CITY, VAKIT_PI_BT_MAC) okunur.
+        Ortam tanımlı değilse mock/placeholder İstanbul değerleri kullanılır.
+        """
+        latitude, longitude, city = get_default_location()
         return PrayerSettings(
             location=Location(
-                latitude=41.0082,  # İstanbul
-                longitude=28.9784,
-                city="İstanbul",
-            )
+                latitude=latitude,
+                longitude=longitude,
+                city=city,
+            ),
+            bluetooth_device_mac=get_default_bluetooth_mac(),
         )
 
     async def exists(self) -> bool:

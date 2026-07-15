@@ -92,6 +92,23 @@ CONFIG_DIR="$HOME/.config/vakit-pi"
 log_info "Ayar dizini oluşturuluyor: $CONFIG_DIR"
 mkdir -p "$CONFIG_DIR"
 
+# 6.1 Kişisel/gizli ortam dosyasını oluştur (konum, BT MAC vb.)
+# .env.example bir MOCK şablondur; gerçek değerler bu yerel dosyada tutulur
+# ve repoya commit'lenmez.
+ENV_FILE="$CONFIG_DIR/vakit-pi.env"
+if [[ ! -f "$ENV_FILE" ]]; then
+    if [[ -f "$PROJECT_DIR/.env.example" ]]; then
+        cp "$PROJECT_DIR/.env.example" "$ENV_FILE"
+    else
+        touch "$ENV_FILE"
+    fi
+    chmod 600 "$ENV_FILE"
+    log_warn "Gizli ortam dosyası oluşturuldu: $ENV_FILE"
+    log_warn "Lütfen gerçek konum/Bluetooth MAC değerlerinizi bu dosyaya girin."
+else
+    log_info "Mevcut ortam dosyası kullanılıyor: $ENV_FILE"
+fi
+
 # 7. Ezan ses dosyalarını kopyala
 AUDIO_DIR="$PROJECT_DIR/src/vakit_pi/assets/audio"
 if [[ ! -d "$AUDIO_DIR" ]]; then
@@ -133,11 +150,17 @@ User=$USER
 Group=$USER
 WorkingDirectory=$PROJECT_DIR
 
-# Environment variables
+# Environment variables (güvenli varsayılanlar)
+# GÜVENLİK: 0.0.0.0 uygulamayı tüm yerel ağa açar ve API kimlik doğrulaması
+# yoktur. Sadece bu makineden erişim için VAKIT_PI_HOST=127.0.0.1 kullanın.
 Environment="VAKIT_PI_HOST=0.0.0.0"
 Environment="VAKIT_PI_PORT=8080"
 Environment="VAKIT_PI_LOG_LEVEL=INFO"
 Environment="VAKIT_PI_SETTINGS_PATH=$CONFIG_DIR/settings.json"
+
+# Kişisel/gizli ayarlar (konum, Bluetooth MAC) yerel dosyadan yüklenir.
+# "-" öneki dosya yoksa hatayı yok sayar.
+EnvironmentFile=-$ENV_FILE
 
 # Uygulama komutu (uv kullanarak)
 ExecStart=$UV_PATH run vakit-pi serve

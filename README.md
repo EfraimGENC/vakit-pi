@@ -145,12 +145,26 @@ Ayarlar `~/.config/vakit-pi/settings.json` dosyasında saklanır:
 
 ### Environment Variables
 
+Ortam değişkenleri `.env` dosyasından (systemd `EnvironmentFile`) veya doğrudan
+ortamdan okunur. Örnek şablonu kopyalayarak başlayın:
+
+```bash
+cp .env.example .env   # sonra .env dosyasını kendi değerlerinizle düzenleyin
+```
+
+> `.env` `.gitignore` kapsamındadır ve **commit edilmez**. Gerçek konum, Bluetooth
+> MAC adresi, iç IP gibi kişisel bilgileri yalnızca yerel `.env` veya
+> `~/.config/vakit-pi/settings.json` içinde tutun. Repoda sadece mock değerli
+> `.env.example` bulunur.
+
 | Değişken | Varsayılan | Açıklama |
 |----------|-----------|----------|
-| `VAKIT_PI_HOST` | `0.0.0.0` | Sunucu adresi |
+| `VAKIT_PI_HOST` | `0.0.0.0` | Sunucu adresi (yalnızca localhost için `127.0.0.1`) |
 | `VAKIT_PI_PORT` | `8080` | Sunucu portu |
 | `VAKIT_PI_LOG_LEVEL` | `INFO` | Log seviyesi |
 | `VAKIT_PI_SETTINGS_PATH` | `~/.config/vakit-pi/settings.json` | Ayar dosyası yolu |
+| `VAKIT_PI_LAT` / `VAKIT_PI_LNG` / `VAKIT_PI_CITY` | `41.0082` / `28.9784` / `İstanbul` (mock) | Varsayılan konum |
+| `VAKIT_PI_BT_MAC` | — | Bluetooth hoparlör MAC adresi |
 
 ## API Endpoints
 
