@@ -1,0 +1,69 @@
+# Vakit-Pi Systemd Service Template
+# ===================================
+# NOT: Bu dosya bir ŞABLONDUR ve yalnızca MOCK/placeholder değerler içerir!
+# install.sh scripti bu dosyayı gerçek kullanıcı/yol bilgileriyle otomatik oluşturur.
+# Manuel kurulum yapıyorsanız, aşağıdaki placeholder değerleri kendi sisteminize göre
+# düzenleyin (gerçek kullanıcı adı, IP vb. bilgileri repoya geri commit'lemeyin):
+#   - User/Group: Kullanıcı adınız (örn: pi)
+#   - WorkingDirectory: Proje dizini (örn: /home/pi/vakit-pi)
+#   - EnvironmentFile: Kişisel/gizli ayarların (konum, BT MAC) tutulduğu yerel dosya
+#   - VAKIT_PI_SETTINGS_PATH: Ayar dosyası yolu
+#   - ExecStart: uv yolu ve proje dizini
+#   - ReadWritePaths: Ayar dizini
+
+[Unit]
+Description=Vakit-Pi - Namaz Vakti ve Ezan Uygulaması
+Documentation=https://github.com/vakit-pi/vakit-pi
+After=network.target sound.target bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/vakit-pi
+
+# Environment variables (güvenli varsayılanlar)
+# GÜVENLİK NOTU: 0.0.0.0 uygulamayı tüm yerel ağa açar ve API kimlik
+# doğrulaması yoktur. Yalnızca bu makineden erişim için 127.0.0.1 kullanın
+# ya da güvenlik duvarı / ters proxy ile erişimi kısıtlayın.
+Environment="VAKIT_PI_HOST=0.0.0.0"
+Environment="VAKIT_PI_PORT=8080"
+Environment="VAKIT_PI_LOG_LEVEL=INFO"
+Environment="VAKIT_PI_SETTINGS_PATH=/home/pi/.config/vakit-pi/settings.json"
+
+# Kişisel/gizli ayarlar (konum, Bluetooth MAC vb.) bu yerel dosyadan gelir.
+# Başındaki "-" dosya yoksa hatayı yok sayar. Bu dosya repoya commit'lenmez;
+# `.env.example` dosyasını kopyalayarak oluşturun.
+EnvironmentFile=-/home/pi/.config/vakit-pi/vakit-pi.env
+
+# PulseAudio / Bluetooth ses için gerekli (System-wide PulseAudio)
+Environment="PULSE_SERVER=/var/run/pulse/native"
+
+# Bluetooth adaptörünü aç (rfkill soft-block durumunda kalabilir)
+ExecStartPre=+/usr/sbin/rfkill unblock bluetooth
+
+# Uygulama komutu (uv kullanarak)
+ExecStart=/home/pi/.local/bin/uv run vakit-pi serve
+
+# Alternatif: pip ile kurulduysa
+# ExecStart=/home/pi/.local/bin/vakit-pi serve
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+# ProtectHome devre dışı - uv cache erişimi için gerekli
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vakit-pi
+
+[Install]
+WantedBy=multi-user.target
