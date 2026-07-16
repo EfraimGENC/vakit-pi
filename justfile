@@ -9,21 +9,39 @@ default:
 # 🚀 Deployment
 # ─────────────────────────────────────────────────────────────
 
-# Sunucuda güncelleme: git pull, sync, restart
+# Sunucuda güncelleme: fetch, reset, sync, restart
 update:
-    # stop, clean, pull, sync, restart, status
-    @echo "🛑 Servis durduruluyor..."
-    @just stop
-    @echo "🧹 Cache dosyaları temizleniyor..."
-    @just clean
-    @echo "📥 Güncellemeler çekiliyor..."
-    git pull origin main
-    @echo "📦 Bağımlılıklar senkronize ediliyor..."
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Sunucu origin/main'in aynasıdır; burada geliştirme yapılmaz. Bu yüzden
+    # `git pull` (merge/rebase) değil `reset --hard` kullanılır — uzakta
+    # force-push (geçmiş yeniden yazımı) olsa bile çalışır.
+    echo "📥 Uzak değişiklikler alınıyor..."
+    git fetch origin main
+    # Sunucuda kaybolabilecek bir şey varsa hiçbir şey yapmadan dur.
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "❌ Çalışma alanı kirli; reset veri kaybettirir. Önce inceleyin:"
+        git status --short
+        exit 1
+    fi
+    if [[ -n "$(git log --oneline origin/main..HEAD)" ]]; then
+        echo "❌ Sunucuda origin/main'de olmayan commit(ler) var:"
+        git log --oneline origin/main..HEAD
+        echo "   Bunlar reset ile silinir. Önce yedekleyin (ör. git branch yedek)."
+        exit 1
+    fi
+    echo "🛑 Servis durduruluyor..."
+    just stop
+    echo "🧹 Cache dosyaları temizleniyor..."
+    just clean
+    echo "🔄 origin/main'e eşitleniyor: $(git rev-parse --short HEAD) → $(git rev-parse --short origin/main)"
+    git reset --hard origin/main
+    echo "📦 Bağımlılıklar senkronize ediliyor..."
     uv sync
-    @echo "🔄 Servis yeniden başlatılıyor..."
+    echo "🔄 Servis yeniden başlatılıyor..."
     sudo systemctl restart vakit-pi
-    @echo "✅ Güncelleme tamamlandı!"
-    @just status
+    echo "✅ Güncelleme tamamlandı!"
+    just status
 
 # Servisi yeniden başlat
 restart:
