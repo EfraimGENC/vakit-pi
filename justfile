@@ -57,9 +57,17 @@ jobs:
 # 🛠️ Geliştirme
 # ─────────────────────────────────────────────────────────────
 
-# Geliştirme sunucusunu başlat
+# Geliştirme sunucusunu başlat (varsa .env yüklenir)
 serve:
-    uv run vakit-pi serve
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -f .env ]]; then
+        echo "🔑 .env yükleniyor..."
+        uv run --env-file .env vakit-pi serve
+    else
+        echo "ℹ️  .env yok, varsayılanlar kullanılıyor (cp .env.example .env)"
+        uv run vakit-pi serve
+    fi
 
 # Bağımlılıkları kur
 sync:
