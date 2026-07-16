@@ -9,8 +9,8 @@ default:
 # 🚀 Deployment
 # ─────────────────────────────────────────────────────────────
 
-# Sunucuda güncelleme: fetch, reset, sync, restart
-update:
+# Sunucuda güncelleme: fetch, reset, sync, restart ("just update force" = kontrolleri atla)
+update force="":
     #!/usr/bin/env bash
     set -euo pipefail
     # Sunucu origin/main'in aynasıdır; burada geliştirme yapılmaz. Bu yüzden
@@ -19,16 +19,23 @@ update:
     echo "📥 Uzak değişiklikler alınıyor..."
     git fetch origin main
     # Sunucuda kaybolabilecek bir şey varsa hiçbir şey yapmadan dur.
-    if [[ -n "$(git status --porcelain)" ]]; then
-        echo "❌ Çalışma alanı kirli; reset veri kaybettirir. Önce inceleyin:"
-        git status --short
-        exit 1
-    fi
-    if [[ -n "$(git log --oneline origin/main..HEAD)" ]]; then
-        echo "❌ Sunucuda origin/main'de olmayan commit(ler) var:"
-        git log --oneline origin/main..HEAD
-        echo "   Bunlar reset ile silinir. Önce yedekleyin (ör. git branch yedek)."
-        exit 1
+    # `just update force` ile bilinçli olarak atlanabilir (ör. kasıtlı force-push sonrası).
+    if [[ "{{force}}" == "force" ]]; then
+        echo "⚠️  force: kontroller atlanıyor, origin/main'de olmayan her şey silinecek."
+    else
+        if [[ -n "$(git status --porcelain)" ]]; then
+            echo "❌ Çalışma alanı kirli; reset veri kaybettirir. Önce inceleyin:"
+            git status --short
+            echo "   Kasıtlıysa: just update force"
+            exit 1
+        fi
+        if [[ -n "$(git log --oneline origin/main..HEAD)" ]]; then
+            echo "❌ Sunucuda origin/main'de olmayan commit(ler) var:"
+            git log --oneline -20 origin/main..HEAD
+            echo "   Bunlar reset ile silinir. Yedeklemek için: git branch yedek"
+            echo "   Kasıtlıysa (ör. uzakta force-push yaptıysanız): just update force"
+            exit 1
+        fi
     fi
     echo "🛑 Servis durduruluyor..."
     just stop
