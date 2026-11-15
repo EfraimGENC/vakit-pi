@@ -220,10 +220,24 @@ class TestAdapterConnect:
     async def test_unpaired_device_is_not_connected_without_pair_flag(
         self, adapter: BluetoothctlAdapter
     ) -> None:
-        adapter._run_command.return_value = (0, "Device X\n\tPaired: no\n\tConnected: no\n")
+        adapter._run_command.return_value = (
+            0,
+            f"Device {MAC} (public)\n\tPaired: no\n\tConnected: no\n",
+        )
         result = await adapter.connect(MAC)
         assert result.success is False
         assert "eşleşmemiş" in result.message
+        adapter._run_piped.assert_not_called()
+
+    async def test_bluez_not_ready_is_not_reported_as_unpaired(
+        self, adapter: BluetoothctlAdapter
+    ) -> None:
+        # Açılışta bluetoothctl cihaz bilgisi yerine denetleyici hatası verir
+        adapter._run_command.return_value = (0, "No default controller available")
+        result = await adapter.connect(MAC)
+        assert result.success is False
+        assert "hazır değil" in result.message
+        assert "eşleşmemiş" not in result.message
         adapter._run_piped.assert_not_called()
 
     async def test_pair_failure_reports_bluetoothctl_error(
@@ -232,7 +246,7 @@ class TestAdapterConnect:
         async def run(*args: str, cmd_timeout: float = 10.0) -> tuple[int, str]:  # noqa: ARG001
             if "pair" in args:
                 return 1, "Failed to pair: org.bluez.Error.AuthenticationFailed"
-            return 0, "Device X\n\tPaired: no\n\tConnected: no\n"
+            return 0, f"Device {MAC} (public)\n\tPaired: no\n\tConnected: no\n"
 
         adapter._run_command = AsyncMock(side_effect=run)  # type: ignore[method-assign]
         result = await adapter.connect(MAC, pair_if_needed=True)
@@ -316,7 +330,10 @@ class TestManager:
         assert result.success is False
         assert h.settings.bluetooth_enabled is False
 
-    async def test_startup_reconnects_when_enabled_and_wanted(self) -> None:
+    async def test_startup_reconnects_when_enabled_and_wanted(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level("INFO")
         h = Harness(
             make_settings(
                 bluetooth_device_mac=MAC, bluetooth_enabled=True, bluetooth_want_connected=True
@@ -326,6 +343,8 @@ class TestManager:
         await h.manager.start()
         try:
             await wait_until(lambda: h.bt.connected)
+            await wait_until(lambda: "Bluetooth bağlandı" in caplog.text)
+            assert "2 başarısız deneme" in caplog.text  # ne kadar sürdüğü loglanır
             assert len(h.bt.connect_calls) == 3  # iki başarısız + bir başarılı: vazgeçmez
             assert all(not pair for _mac, pair in h.bt.connect_calls)  # otomatik: eşleştirme yok
             await wait_until(lambda: h.audio.sink_calls == [MAC])
