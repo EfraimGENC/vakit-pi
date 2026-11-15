@@ -149,6 +149,10 @@ class BluetoothPort(ABC):
     async def is_connected(self, mac: str) -> bool:
         """Cihaz bağlı mı?"""
 
+    @abstractmethod
+    async def remove(self, mac: str) -> bool:
+        """Cihazı ve eşleşme kaydını sil. Başarılıysa (ya da zaten yoksa) True."""
+
 
 class SystemVolumePort(ABC):
     """Sistem ses seviyesi arayüzü (Bluetooth hoparlör seviyesi)."""

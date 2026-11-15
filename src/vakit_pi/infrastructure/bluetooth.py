@@ -272,6 +272,18 @@ class BluetoothctlAdapter(BluetoothPort):
 
         return not still_connected
 
+    async def remove(self, mac: str) -> bool:
+        """Cihazı ve eşleşme kaydını sil."""
+        logger.info(f"Bluetooth cihaz siliniyor: {mac}")
+        _rc, output = await self._run_command("remove", mac, cmd_timeout=10.0)
+        logger.info(f"Bluetooth remove çıktısı: {output[:200]}")
+
+        # BlueZ cihazı artık tanımıyorsa silme tamamdır
+        removed = await self._get_info(mac) is None
+        if not removed:
+            logger.warning(f"Bluetooth cihaz silinemedi: {mac} — {extract_error(output)}")
+        return removed
+
     async def is_connected(self, mac: str) -> bool:
         """Cihaz bağlı mı kontrol et."""
         rc, output = await self._run_command("info", mac)

@@ -193,6 +193,29 @@ class BluetoothManager:
                 return ActionResult(True, f"Bluetooth bağlantısı kesildi: {mac}")
             return ActionResult(False, f"Bluetooth bağlantı kesme başarısız: {mac}")
 
+    async def remove_device(self, mac: str) -> ActionResult:
+        """Eşleşmiş cihazı sil. Seçili hoparlörse bağlı kalma niyeti ve seçim de temizlenir."""
+        async with self._lock:
+            saved_mac = self._get_settings().bluetooth_device_mac
+            is_selected = bool(saved_mac) and (saved_mac or "").upper() == mac.upper()
+
+            if is_selected:
+                await self._cancel_supervisor()
+            if await self._bluetooth.is_connected(mac):
+                await self._bluetooth.disconnect(mac)
+
+            if not await self._bluetooth.remove(mac):
+                if is_selected:
+                    self._ensure_supervisor()  # silinemedi: önceki niyetle devam
+                return ActionResult(False, f"Cihaz silinemedi: {mac}")
+
+            if is_selected:
+                await self._update_settings(
+                    bluetooth_device_mac=None, bluetooth_want_connected=False
+                )
+                self._last_error = None
+            return ActionResult(True, f"Eşleşme silindi: {mac}")
+
     # ---------- arka plan: otomatik yeniden bağlanma ----------
 
     def _ensure_supervisor(self) -> None:

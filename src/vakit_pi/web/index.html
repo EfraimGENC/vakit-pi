@@ -444,6 +444,16 @@
                     >
                       {{ device.paired === false ? 'Eşleştir ve Bağlan' : 'Bağlan' }}
                     </button>
+                    <button
+                      v-if="device.paired !== false"
+                      @click="btRemove(device)"
+                      :disabled="btConnecting || btScanning"
+                      title="Eşleşmeyi sil"
+                      aria-label="Eşleşmeyi sil"
+                      class="bg-white/10 hover:bg-red-600 disabled:opacity-50 rounded-lg px-2.5 py-1.5 text-xs transition"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1117,6 +1127,30 @@
             }
           };
 
+          const btRemove = async (device) => {
+            if (!confirm(`"${device.name}" eşleşmesi silinsin mi? Tekrar kullanmak için yeniden eşleştirmeniz gerekir.`)) {
+              return;
+            }
+            btConnecting.value = true;
+            try {
+              const res = await fetch(`${API_BASE}/bluetooth/devices/${encodeURIComponent(device.mac)}`, {
+                method: "DELETE",
+              });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                showToast(data.message, "success");
+              } else {
+                showToast(data.detail || data.message || "Silme başarısız!", "error");
+              }
+              btScanned.value = null;
+              await fetchBluetoothDevices();
+            } catch (e) {
+              showToast("Bluetooth hatası: " + e.message, "error");
+            } finally {
+              btConnecting.value = false;
+            }
+          };
+
           const btDisconnect = async () => {
             btConnecting.value = true;
             try {
@@ -1232,6 +1266,7 @@
             fetchBluetoothDevices,
             btTogglePower,
             btScan,
+            btRemove,
             btConnect,
             btDisconnect,
             btDeviceName,

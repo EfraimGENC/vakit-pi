@@ -5,6 +5,7 @@ from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi.testclient import TestClient
 
 from vakit_pi.domain.models import Location, PrayerName, PrayerSettings
 from vakit_pi.infrastructure.bluetooth import (
@@ -49,6 +50,8 @@ class FakeBluetooth(BluetoothPort):
         self.connect_calls: list[tuple[str, bool]] = []
         self.disconnect_calls: list[str] = []
         self.scan_result: list[BluetoothDeviceInfo] = []
+        self.remove_calls: list[str] = []
+        self.remove_works = True
 
     async def list_paired_devices(self) -> list[dict[str, str]]:
         return []
@@ -77,6 +80,10 @@ class FakeBluetooth(BluetoothPort):
 
     async def is_connected(self, mac: str) -> bool:  # noqa: ARG002
         return self.connected
+
+    async def remove(self, mac: str) -> bool:
+        self.remove_calls.append(mac)
+        return self.remove_works
 
 
 class FakeAudio(SystemVolumePort):
@@ -182,6 +189,24 @@ class TestParsing:
 
     def test_extract_error_on_empty_output(self) -> None:
         assert "çıktı vermedi" in extract_error("")
+
+
+class TestAdapterRemove:
+    async def test_remove_succeeds_when_bluez_forgets_device(self) -> None:
+        adapter = BluetoothctlAdapter()
+
+        async def run(*args: str, cmd_timeout: float = 10.0) -> tuple[int, str]:  # noqa: ARG001
+            if "remove" in args:
+                return 0, "[DEL] Device X\nDevice has been removed"
+            return 1, f"Device {MAC} not available"
+
+        adapter._run_command = AsyncMock(side_effect=run)  # type: ignore[method-assign]
+        assert await adapter.remove(MAC) is True
+
+    async def test_remove_fails_when_device_still_known(self) -> None:
+        adapter = BluetoothctlAdapter()
+        adapter._run_command = AsyncMock(return_value=(0, SPEAKER_INFO))  # type: ignore[method-assign]
+        assert await adapter.remove(MAC) is False
 
 
 class TestAdapterConnect:
@@ -337,6 +362,49 @@ class TestManager:
         finally:
             await h.manager.stop()
 
+    async def test_remove_selected_device_clears_selection_and_intent(self) -> None:
+        h = Harness(
+            make_settings(
+                bluetooth_device_mac=MAC, bluetooth_enabled=True, bluetooth_want_connected=True
+            )
+        )
+        h.bt.powered = h.bt.connected = True
+        result = await h.manager.remove_device(MAC.lower())
+        assert result.success
+        assert h.bt.disconnect_calls == [MAC.lower()]  # önce bağlantı kesilir
+        assert h.bt.remove_calls == [MAC.lower()]
+        assert h.settings.bluetooth_device_mac is None
+        assert h.settings.bluetooth_want_connected is False
+        assert h.settings.bluetooth_enabled is True  # Bluetooth açık kalır
+
+    async def test_remove_other_device_keeps_selection(self) -> None:
+        h = Harness(
+            make_settings(
+                bluetooth_device_mac=MAC, bluetooth_enabled=True, bluetooth_want_connected=True
+            )
+        )
+        other = "AA:BB:CC:DD:EE:FF"
+        result = await h.manager.remove_device(other)
+        assert result.success
+        assert h.bt.remove_calls == [other]
+        assert h.settings.bluetooth_device_mac == MAC
+        assert h.settings.bluetooth_want_connected is True
+
+    async def test_failed_remove_keeps_state_and_reports(self) -> None:
+        h = Harness(
+            make_settings(
+                bluetooth_device_mac=MAC, bluetooth_enabled=True, bluetooth_want_connected=True
+            )
+        )
+        h.bt.remove_works = False
+        result = await h.manager.remove_device(MAC)
+        try:
+            assert result.success is False
+            assert h.settings.bluetooth_device_mac == MAC
+            assert h.settings.bluetooth_want_connected is True
+        finally:
+            await h.manager.stop()
+
     async def test_scan_powers_on_without_persisting(self) -> None:
         h = Harness()
         h.bt.scan_result = [BluetoothDeviceInfo(MAC, "Behringer C210", False, False, True)]
@@ -394,3 +462,39 @@ class TestAdhanGuard:
         service, player = self.make_service(AsyncMock(side_effect=RuntimeError("boom")))
         await service.play_adhan(PrayerName.DHUHR)
         player.play.assert_awaited_once()
+
+
+# ---------- API ----------
+
+
+class TestRemoveRoute:
+    def make_client(self, result: ActionResult) -> tuple["TestClient", MagicMock]:
+        from vakit_pi.api.app import create_app
+        from vakit_pi.api.dependencies import get_app_state
+
+        manager = MagicMock()
+        manager.remove_device = AsyncMock(return_value=result)
+        state = MagicMock()
+        state.bluetooth_manager = manager
+        app = create_app()
+        app.dependency_overrides[get_app_state] = lambda: state
+        return TestClient(app), manager
+
+    def test_delete_removes_device(self) -> None:
+        client, manager = self.make_client(ActionResult(True, "Eşleşme silindi"))
+        response = client.delete(f"/api/bluetooth/devices/{MAC}")
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        manager.remove_device.assert_awaited_once_with(MAC)
+
+    def test_delete_reports_failure_as_502(self) -> None:
+        client, _ = self.make_client(ActionResult(False, "Cihaz silinemedi"))
+        response = client.delete(f"/api/bluetooth/devices/{MAC}")
+        assert response.status_code == 502
+        assert "silinemedi" in response.json()["detail"]
+
+    def test_delete_rejects_malformed_mac(self) -> None:
+        client, manager = self.make_client(ActionResult(True))
+        response = client.delete("/api/bluetooth/devices/not-a-mac")
+        assert response.status_code == 422
+        manager.remove_device.assert_not_called()

@@ -6,6 +6,7 @@ from typing import Annotated
 
 from babel.dates import format_date
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Path as PathParam
 
 from vakit_pi import __version__
 from vakit_pi.api.dependencies import AppState, get_app_state
@@ -491,6 +492,18 @@ async def bluetooth_scan(
         )
         for d in devices
     ]
+
+
+@router.delete("/bluetooth/devices/{mac}", response_model=ApiResponse)
+async def bluetooth_remove_device(
+    mac: Annotated[str, PathParam(pattern=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")],
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ApiResponse:
+    """Eşleşmiş Bluetooth cihazı sil (eşleşme kaydı kalkar, gerekirse yeniden eşleştirilir)."""
+    result = await state.bluetooth_manager.remove_device(mac)
+    if not result.success:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=result.message)
+    return ApiResponse(success=True, message=result.message)
 
 
 @router.post("/bluetooth/connect", response_model=ApiResponse)
