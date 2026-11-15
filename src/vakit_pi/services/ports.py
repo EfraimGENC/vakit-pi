@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Coroutine
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
@@ -98,6 +99,25 @@ class EventBusPort(ABC):
         """Event tipine abone ol."""
 
 
+@dataclass(frozen=True)
+class ActionResult:
+    """Bir Bluetooth işleminin sonucu (başarı + kullanıcıya gösterilecek açıklama)."""
+
+    success: bool
+    message: str = ""
+
+
+@dataclass(frozen=True)
+class BluetoothDeviceInfo:
+    """Taramada bulunan veya eşleşmiş Bluetooth cihazı."""
+
+    mac: str
+    name: str
+    paired: bool
+    connected: bool
+    audio: bool  # Ses çıkışı (A2DP sink) destekliyor mu
+
+
 class BluetoothPort(ABC):
     """Bluetooth cihaz yönetimi arayüzü (port)."""
 
@@ -106,8 +126,20 @@ class BluetoothPort(ABC):
         """Eşleşmiş Bluetooth cihazlarını listele."""
 
     @abstractmethod
-    async def connect(self, mac: str) -> bool:
-        """Bluetooth cihaza bağlan."""
+    async def scan(self, duration: float = 8.0) -> list[BluetoothDeviceInfo]:
+        """Yakındaki Bluetooth cihazlarını tara (eşleşmişler dahil)."""
+
+    @abstractmethod
+    async def is_powered(self) -> bool:
+        """Bluetooth adaptörü açık mı?"""
+
+    @abstractmethod
+    async def set_power(self, on: bool) -> bool:
+        """Bluetooth adaptörünü aç/kapat. Başarılıysa True."""
+
+    @abstractmethod
+    async def connect(self, mac: str, *, pair_if_needed: bool = False) -> ActionResult:
+        """Bluetooth cihaza bağlan. pair_if_needed=True ise eşleşmemiş cihazı eşleştirir."""
 
     @abstractmethod
     async def disconnect(self, mac: str) -> bool:
@@ -128,6 +160,10 @@ class SystemVolumePort(ABC):
     @abstractmethod
     async def get_volume(self) -> int | None:
         """Mevcut sistem ses seviyesini oku (0-100)."""
+
+    @abstractmethod
+    async def set_default_bluetooth_sink(self, mac: str) -> bool:
+        """Verilen Bluetooth cihazın ses çıkışını varsayılan çıkış yap."""
 
 
 class GeocodingPort(ABC):

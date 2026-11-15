@@ -1,8 +1,9 @@
 """Application state and dependencies."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from vakit_pi.domain.models import PrayerSettings
 from vakit_pi.infrastructure.audio import BaseAudioPlayer, get_best_player
@@ -12,6 +13,7 @@ from vakit_pi.infrastructure.scheduler import APSchedulerAdapter
 from vakit_pi.infrastructure.settings_repository import JsonSettingsRepository
 from vakit_pi.infrastructure.system_volume import PulseAudioVolumeAdapter
 from vakit_pi.services.adhan_service import AdhanService
+from vakit_pi.services.bluetooth_manager import BluetoothManager
 from vakit_pi.services.prayer_service import PrayerService
 from vakit_pi.services.scheduler_service import SchedulerService
 
@@ -29,6 +31,7 @@ class AppState:
     event_bus: InMemoryEventBus
     audio_player: BaseAudioPlayer
     bluetooth_adapter: BluetoothctlAdapter
+    bluetooth_manager: BluetoothManager
     system_volume: PulseAudioVolumeAdapter
     started_at: datetime
     audio_dir: Path
@@ -36,6 +39,20 @@ class AppState:
 
 # Global application state (singleton)
 _app_state: AppState | None = None
+
+
+def _current_settings() -> PrayerSettings:
+    """Güncel ayarlar (route'lar state.settings'i yeni nesneyle değiştirebilir)."""
+    return get_app_state().settings
+
+
+async def _update_settings_fields(**changes: Any) -> None:
+    """Ayarların bazı alanlarını değiştir, servislere bildir ve diske kaydet."""
+    state = get_app_state()
+    new_settings = replace(state.settings, **changes)
+    state.settings = new_settings
+    state.adhan_service.update_settings(new_settings)
+    await state.settings_repository.save(new_settings)
 
 
 async def initialize_app_state(
@@ -73,6 +90,13 @@ async def initialize_app_state(
     system_volume = PulseAudioVolumeAdapter()
 
     # Services
+    bluetooth_manager = BluetoothManager(
+        bluetooth=bluetooth_adapter,
+        audio=system_volume,
+        get_settings=_current_settings,
+        update_settings=_update_settings_fields,
+    )
+
     prayer_service = PrayerService(
         location=settings.location,
         fajr_isha_method=settings.fajr_isha_method,
@@ -85,6 +109,7 @@ async def initialize_app_state(
         settings=settings,
         event_bus=event_bus,
         audio_dir=audio_dir,
+        output_ready=bluetooth_manager.output_ready,
     )
 
     scheduler_service = SchedulerService(
@@ -104,6 +129,7 @@ async def initialize_app_state(
         event_bus=event_bus,
         audio_player=audio_player,
         bluetooth_adapter=bluetooth_adapter,
+        bluetooth_manager=bluetooth_manager,
         system_volume=system_volume,
         started_at=datetime.now(),
         audio_dir=audio_dir,

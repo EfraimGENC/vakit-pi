@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import random
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from vakit_pi.domain.events import (
@@ -25,6 +26,7 @@ class AdhanService:
         settings: PrayerSettings,
         event_bus: EventBusPort | None = None,
         audio_dir: Path | None = None,
+        output_ready: Callable[[], Awaitable[bool]] | None = None,
     ) -> None:
         """
         Initialize adhan service.
@@ -34,11 +36,14 @@ class AdhanService:
             settings: Namaz ayarları
             event_bus: Event bus (opsiyonel)
             audio_dir: Ezan ses dosyalarının bulunduğu dizin
+            output_ready: Ses çıkışı hazır mı? (örn. Bluetooth hoparlör bağlı mı).
+                False dönerse ezan çalınmaz, sadece log tutulur.
         """
         self._audio_player = audio_player
         self._settings = settings
         self._event_bus = event_bus
         self._audio_dir = audio_dir or Path(__file__).parent.parent / "assets" / "audio"
+        self._output_ready = output_ready
         self._is_playing = False
 
     @property
@@ -137,6 +142,13 @@ class AdhanService:
             logger.info(f"{prayer.display_name} vakti için ezan devre dışı.")
             return
 
+        if not await self._is_output_ready():
+            logger.warning(
+                f"{prayer.display_name} vakti geldi ancak Bluetooth hoparlör bağlı değil; "
+                "ezan çalınmadı."
+            )
+            return
+
         if self._is_playing:
             logger.warning("Zaten bir ezan çalıyor, yeni ezan başlatılmadı.")
             return
@@ -172,6 +184,16 @@ class AdhanService:
                 self._event_bus.publish(AudioErrorEvent(error_message=error_msg, prayer=prayer))
         finally:
             self._is_playing = False
+
+    async def _is_output_ready(self) -> bool:
+        """Ses çıkışı hazır mı? Kontrol başarısız olursa çalmayı engelleme."""
+        if self._output_ready is None:
+            return True
+        try:
+            return await self._output_ready()
+        except Exception as e:
+            logger.error(f"Ses çıkışı kontrolü başarısız, ezan yine de çalınacak: {e}")
+            return True
 
     async def stop_adhan(self) -> None:
         """Ezanı veya ses testini durdur."""

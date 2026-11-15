@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 # Background task referansları
 _midnight_task: asyncio.Task[None] | None = None
-_bt_connect_task: asyncio.Task[None] | None = None
 
 
 async def _midnight_scheduler_loop(state: "AppState") -> None:
@@ -63,7 +62,7 @@ async def _midnight_scheduler_loop(state: "AppState") -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
-    global _midnight_task, _bt_connect_task
+    global _midnight_task
 
     # Startup
     logger.info("Vakit-Pi başlatılıyor...")
@@ -90,11 +89,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _midnight_task = asyncio.create_task(_midnight_scheduler_loop(state))
     logger.info("Gece yarısı planlama döngüsü başlatıldı.")
 
-    # Bluetooth auto-connect
-    bt_mac = state.settings.bluetooth_device_mac
-    if bt_mac:
-        _bt_connect_task = asyncio.create_task(state.bluetooth_adapter.auto_connect_loop(bt_mac))
-        logger.info(f"Bluetooth auto-connect başlatıldı: {bt_mac}")
+    # Bluetooth: kayıtlı son duruma göre (açık + bağlı kalma niyeti) otomatik toparla
+    await state.bluetooth_manager.start()
 
     # Kayıtlı master ses seviyesini sistem seviyesine uygula
     master_vol = state.settings.volume.master
@@ -109,11 +105,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Vakit-Pi kapatılıyor...")
 
     # Background task'ları iptal et
-    for task in [_midnight_task, _bt_connect_task]:
-        if task and not task.done():
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+    if _midnight_task and not _midnight_task.done():
+        _midnight_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await _midnight_task
+    await state.bluetooth_manager.stop()
 
     await shutdown_app_state()
     logger.info("Vakit-Pi kapatıldı.")

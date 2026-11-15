@@ -140,6 +140,25 @@ class BluetoothDeviceSchema(BaseModel):
     mac: str = Field(description="MAC adresi")
     name: str = Field(description="Cihaz adı")
     connected: bool = Field(description="Bağlı mı?")
+    paired: bool = Field(default=True, description="Eşleşmiş mi?")
+    audio: bool = Field(default=False, description="Ses çıkışı (hoparlör/kulaklık) cihazı mı?")
+
+
+class BluetoothStatusSchema(BaseModel):
+    """Bluetooth durum şeması."""
+
+    enabled: bool = Field(description="Bluetooth açık mı (kalıcı kullanıcı tercihi)")
+    powered: bool = Field(description="Bluetooth adaptörü şu an açık mı")
+    device_mac: str | None = Field(description="Seçili hoparlörün MAC adresi")
+    want_connected: bool = Field(description="Seçili hoparlöre bağlı kalınmak isteniyor mu")
+    connected: bool = Field(description="Hoparlör şu an bağlı mı")
+    last_error: str | None = Field(default=None, description="Son bağlantı hatası")
+
+
+class BluetoothPowerRequest(BaseModel):
+    """Bluetooth aç/kapat isteği."""
+
+    enabled: bool
 
 
 class BluetoothConnectRequest(BaseModel):
