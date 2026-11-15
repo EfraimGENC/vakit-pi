@@ -1,6 +1,12 @@
-# Raspberry Pi 4 - Bluetooth Hoparlör Otomatik Bağlantı Rehberi
+# Raspberry Pi 4 - Bluetooth Hoparlör Kurulum Rehberi
 
-Bu rehber, Raspberry Pi 4 (Bookworm Lite) üzerinde SSH veya kullanıcı oturumu olmadan Bluetooth hoparlöre otomatik bağlanma ve varsayılan ses çıkışı yapma adımlarını içerir.
+Bu rehber, Raspberry Pi 4 (Bookworm Lite) üzerinde SSH veya kullanıcı oturumu olmadan
+Bluetooth hoparlöre ses çıkışı için sistem tarafındaki hazırlığı anlatır.
+
+Hoparlörü **seçme, eşleştirme, bağlanma ve elektrik kesintisinden sonra yeniden bağlanma**
+artık uygulamanın kendisi tarafından yapılır (web arayüzü → Bluetooth kartı).
+Eski sürümlerdeki MAC adresi sabit `bluetooth-autoconnect` script/servisine ve
+`system.pa` içindeki `set-default-sink` satırına **gerek yoktur**.
 
 ---
 
@@ -8,23 +14,11 @@ Bu rehber, Raspberry Pi 4 (Bookworm Lite) üzerinde SSH veya kullanıcı oturumu
 
 - Raspberry Pi 4 + Raspberry Pi OS Bookworm Lite
 - Bluetooth hoparlör (örn: Behringer C210)
-- Hoparlör önceden eşleştirilmiş olmalı
+- `bluez`, `pulseaudio`, `pulseaudio-module-bluetooth` paketleri (`deploy/install.sh` kurar)
 
 ---
 
-## 1. Bluetooth Cihazını Eşleştir ve Güvenilir Yap
-
-```bash
-# Bluetooth MAC adresini bul
-bluetoothctl devices
-
-# Cihazı güvenilir yap (MAC adresini değiştir)
-bluetoothctl trust XX:XX:XX:XX:XX:XX
-```
-
----
-
-## 2. Kullanıcı PulseAudio'yu Devre Dışı Bırak
+## 1. Kullanıcı PulseAudio'yu Devre Dışı Bırak
 
 System-wide PulseAudio kullanacağımız için kullanıcı servislerini kapatıyoruz:
 
@@ -33,40 +27,23 @@ systemctl --user disable pulseaudio.service pulseaudio.socket
 systemctl --user mask pulseaudio.service pulseaudio.socket
 ```
 
----
-
-## 3. Linger'ı Aktifleştir
+## 2. Linger'ı Aktifleştir
 
 ```bash
 sudo loginctl enable-linger $USER
 ```
 
----
+## 3. System-Wide PulseAudio
 
-## 4. System-Wide PulseAudio Ayarları
+`/etc/pulse/system.pa` dosyasının sonuna ekleyin (MAC **yazmayın**):
 
-### 4.1 PulseAudio Config Dosyasını Düzenle
-
-```bash
-sudo nano /etc/pulse/system.pa
-```
-
-En alta ekle:
 ```
 load-module module-bluetooth-policy
 load-module module-bluetooth-discover
-set-default-sink bluez_sink.XX_XX_XX_XX_XX_XX.a2dp_sink
 ```
 
-> **Not:** MAC adresindeki `:` karakterleri `_` ile değiştirilir.
+`/etc/systemd/system/pulseaudio.service`:
 
-### 4.2 PulseAudio System Servisi Oluştur
-
-```bash
-sudo nano /etc/systemd/system/pulseaudio.service
-```
-
-İçeriği:
 ```ini
 [Unit]
 Description=PulseAudio System-Wide Server
@@ -82,129 +59,77 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### 4.3 Kullanıcıyı Gerekli Gruplara Ekle
+Kullanıcıyı gerekli gruplara ekleyin:
 
 ```bash
-sudo usermod -aG pulse-access $USER
-sudo usermod -aG audio $USER
+sudo usermod -aG pulse-access,audio,bluetooth $USER
 ```
 
----
-
-## 5. Bluetooth Autoconnect Script'i Oluştur
-
-```bash
-sudo nano /usr/local/bin/bluetooth-autoconnect.sh
-```
-
-İçeriği:
-```bash
-#!/bin/bash
-
-MAC="XX:XX:XX:XX:XX:XX"
-
-while true; do
-    if ! bluetoothctl info $MAC | grep -q "Connected: yes"; then
-        echo "$(date): Bağlı değil, bağlanılıyor..."
-        bluetoothctl connect $MAC
-    fi
-    sleep 30
-done
-```
-
-Çalıştırılabilir yap:
-```bash
-sudo chmod +x /usr/local/bin/bluetooth-autoconnect.sh
-```
-
----
-
-## 6. Bluetooth Autoconnect Servisi Oluştur
-
-```bash
-sudo nano /etc/systemd/system/bluetooth-autoconnect.service
-```
-
-İçeriği:
-```ini
-[Unit]
-Description=Auto-connect Bluetooth Speaker
-After=pulseaudio.service bluetooth.target
-Wants=pulseaudio.service
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/bluetooth-autoconnect.sh
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
----
-
-## 7. Servisleri Aktifleştir
+## 4. Servisleri Aktifleştir
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable bluetooth
-sudo systemctl enable pulseaudio.service
-sudo systemctl enable bluetooth-autoconnect.service
+sudo systemctl enable --now bluetooth pulseaudio.service
+sudo systemctl restart vakit-pi
 ```
+
+## 5. Hoparlörü Bağla (Arayüzden)
+
+1. Web arayüzünde **Bluetooth** kartındaki anahtarla Bluetooth'u açın.
+2. Hoparlörü eşleşme moduna alın, **🔍 Hoparlör Tara**'ya basın (~8 sn).
+3. Listeden hoparlörü seçip **Eşleştir ve Bağlan**'a basın.
+
+Bağlanınca uygulama, hoparlörün ses çıkışını (`pactl set-default-sink`) otomatik olarak
+varsayılan yapar. Seçim ve durum `settings.json` içinde kalıcı saklanır.
+
+## Elektrik Kesintisi Sonrası Davranış
+
+| Kesinti öncesi durum | Elektrik gelince |
+|---|---|
+| Bluetooth açık + hoparlöre bağlı | Aynı hoparlöre süresiz yeniden bağlanmayı dener (3 sn → en çok 60 sn aralıkla) |
+| Bluetooth açık, **Bağlantıyı Kes** yapılmış | Bluetooth açılır, bağlanılmaz |
+| Bluetooth kapalı | Bluetooth kapalı kalır |
+
+Hoparlör gün içinde kapanıp açılırsa (30 sn'lik kontrolle) yeniden bağlanılır.
+Bluetooth çıkışı bekleniyorken hoparlör bağlı değilse ezan çalınmaz; journal'a
+`Bluetooth hoparlör bağlı değil; ezan çalınmadı` uyarısı yazılır.
 
 ---
 
-## 8. Yeniden Başlat ve Test Et
+## Eski Kurulumdan Geçiş
+
+Daha önce `bluetooth-autoconnect` servisi kurduysanız, uygulamayla çakışmaması için kaldırın:
 
 ```bash
-sudo reboot
+sudo systemctl disable --now bluetooth-autoconnect.service
+sudo rm /etc/systemd/system/bluetooth-autoconnect.service /usr/local/bin/bluetooth-autoconnect.sh
+sudo systemctl daemon-reload
 ```
 
-Reboot sonrası SSH **bağlanmadan** hoparlörden bağlantı sesini bekle.
+`/etc/pulse/system.pa` içindeki `set-default-sink bluez_sink.XX_...` satırını da silin.
+Ayar dosyasında kayıtlı bir `bluetooth_device_mac` varsa, ilk açılışta o hoparlöre bağlanma
+davranışı korunur.
 
 ---
 
-## Sorun Giderme Komutları
+## Sorun Giderme
 
 ```bash
-# Bluetooth bağlantı durumu
-bluetoothctl info XX:XX:XX:XX:XX:XX | grep Connected
+# Uygulama logları (bağlantı hatasının gerçek nedeni burada)
+sudo journalctl -u vakit-pi -f | grep -i bluetooth
 
-# Servis durumları
-systemctl status bluetooth-autoconnect.service
-systemctl status pulseaudio.service
-
-# Servis logları
-journalctl -u bluetooth-autoconnect.service -b
-journalctl -u pulseaudio.service -b
+# Bluetooth durumu ve cihaz bilgisi
+bluetoothctl show | grep Powered
+bluetoothctl info XX:XX:XX:XX:XX:XX
 
 # Ses çıkışlarını listele
 PULSE_SERVER=/var/run/pulse/native pactl list sinks short
 
 # Manuel ses testi
 PULSE_SERVER=/var/run/pulse/native paplay /usr/share/sounds/alsa/Front_Center.wav
-
-# Manuel bağlantı
-bluetoothctl connect XX:XX:XX:XX:XX:XX
 ```
-
----
-
-## Özet: Dosya Konumları
-
-| Dosya | Konum |
-|-------|-------|
-| Autoconnect Script | `/usr/local/bin/bluetooth-autoconnect.sh` |
-| Autoconnect Service | `/etc/systemd/system/bluetooth-autoconnect.service` |
-| PulseAudio Service | `/etc/systemd/system/pulseaudio.service` |
-| PulseAudio Config | `/etc/pulse/system.pa` |
-
----
 
 ## Notlar
 
-- MAC adresi her cihaz için farklıdır, kendi cihazının MAC adresini kullan
-- Script her 30 saniyede bağlantıyı kontrol eder
-- Hoparlör kapalıysa bağlantı kurulamaz, açık olduğundan emin ol
-- Elektrik gidip gelse bile otomatik bağlanır
+- Hoparlör kapalıysa bağlantı kurulamaz; açık ve eşleşme modunda olduğundan emin olun.
+- Tarama sırasında ses akışı kısa süre bozulabilir; yayın sırasında taramayın.

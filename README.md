@@ -108,19 +108,25 @@ sudo systemctl restart vakit-pi
 sudo journalctl -u vakit-pi -f
 ```
 
-## Bluetooth Hoparlör Eşleştirme
+## Bluetooth Hoparlör
 
-```bash
-bluetoothctl
-> power on
-> agent on
-> scan on
-# Hoparlörünüzün MAC adresini bulun
-> pair XX:XX:XX:XX:XX:XX
-> connect XX:XX:XX:XX:XX:XX
-> trust XX:XX:XX:XX:XX:XX
-> quit
-```
+Hoparlör web arayüzündeki **Bluetooth** kartından yönetilir; terminale gerek yoktur:
+
+1. Anahtarla Bluetooth'u açın.
+2. Hoparlörü eşleşme moduna alıp **🔍 Hoparlör Tara**'ya basın.
+3. Listeden hoparlörü seçin: **Eşleştir ve Bağlan**.
+
+Durum kalıcıdır (`bluetooth_enabled`, `bluetooth_device_mac`, `bluetooth_want_connected`).
+Elektrik kesintisinden sonra Bluetooth açık ve bir hoparlöre bağlıysanız uygulama o hoparlöre
+süresiz olarak yeniden bağlanmayı dener; hoparlör gün içinde kapanıp açılsa da tekrar bağlanır.
+**Bağlantıyı Kes**'e bastıysanız elektrik gelince kendiliğinden bağlanılmaz.
+
+Bluetooth çıkışı bekleniyorken (açık + bağlı kalma niyeti) ezan vakti geldiğinde hoparlör
+bağlı değilse ezan çalınmaz, yalnızca uyarı logu yazılır. Bluetooth kapalıysa ezan
+varsayılan ses çıkışından çalınır.
+
+Elle denemek isterseniz: `bluetoothctl` → `power on`, `scan on`, `pair <MAC>`, `trust <MAC>`, `connect <MAC>`.
+Detaylı sistem kurulumu için bkz. [docs/bluetooth-speaker-setup.md](docs/bluetooth-speaker-setup.md).
 
 ## Konfigürasyon
 
@@ -164,7 +170,7 @@ cp .env.example .env   # sonra .env dosyasını kendi değerlerinizle düzenleyi
 | `VAKIT_PI_LOG_LEVEL` | `INFO` | Log seviyesi |
 | `VAKIT_PI_SETTINGS_PATH` | `~/.config/vakit-pi/settings.json` | Ayar dosyası yolu |
 | `VAKIT_PI_LAT` / `VAKIT_PI_LNG` / `VAKIT_PI_CITY` | `41.0082` / `28.9784` / `İstanbul` (mock) | Varsayılan konum |
-| `VAKIT_PI_BT_MAC` | — | Bluetooth hoparlör MAC adresi |
+| `VAKIT_PI_BT_MAC` | — | (İsteğe bağlı) İlk açılışta kullanılacak hoparlör MAC'i; normalde arayüzden seçilir |
 
 ## API Endpoints
 

@@ -272,6 +272,9 @@ class PrayerSettings:
     fajr_isha_method: int = 2  # Diyanet metodu
     asr_fiqh: int = 1  # Hanefi mezhebi
     bluetooth_device_mac: str | None = None
+    # Bluetooth kalıcı durumu: elektrik kesintisinden sonra son duruma göre davranılır.
+    bluetooth_enabled: bool = False  # Bluetooth adaptörü açık mı (kullanıcı niyeti)
+    bluetooth_want_connected: bool = False  # Seçili hoparlöre bağlı kalınmak isteniyor mu
 
     def is_prayer_enabled(self, prayer: PrayerName) -> bool:
         """Belirtilen vakit için ezan aktif mi?"""
@@ -300,12 +303,15 @@ class PrayerSettings:
             "fajr_isha_method": self.fajr_isha_method,
             "asr_fiqh": self.asr_fiqh,
             "bluetooth_device_mac": self.bluetooth_device_mac,
+            "bluetooth_enabled": self.bluetooth_enabled,
+            "bluetooth_want_connected": self.bluetooth_want_connected,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> Self:
         """Dictionary'den oluştur."""
         location_data = data.get("location", {})
+        bluetooth_mac = data.get("bluetooth_device_mac")
         return cls(
             location=Location(
                 latitude=location_data.get("latitude", 41.0),
@@ -329,5 +335,11 @@ class PrayerSettings:
             pre_alert_minutes=data.get("pre_alert_minutes", 0),
             fajr_isha_method=data.get("fajr_isha_method", 2),
             asr_fiqh=data.get("asr_fiqh", 1),
-            bluetooth_device_mac=data.get("bluetooth_device_mac"),
+            bluetooth_device_mac=bluetooth_mac,
+            # Eski ayar dosyalarında bu alanlar yok: MAC kayıtlıysa eski davranış
+            # (açılışta otomatik bağlan) korunur.
+            bluetooth_enabled=data.get("bluetooth_enabled", bluetooth_mac is not None),
+            bluetooth_want_connected=data.get(
+                "bluetooth_want_connected", bluetooth_mac is not None
+            ),
         )

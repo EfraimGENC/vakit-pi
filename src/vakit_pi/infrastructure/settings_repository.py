@@ -81,13 +81,16 @@ class JsonSettingsRepository(SettingsRepositoryPort):
         Ortam tanımlı değilse mock/placeholder İstanbul değerleri kullanılır.
         """
         latitude, longitude, city = get_default_location()
+        default_mac = get_default_bluetooth_mac()
         return PrayerSettings(
             location=Location(
                 latitude=latitude,
                 longitude=longitude,
                 city=city,
             ),
-            bluetooth_device_mac=get_default_bluetooth_mac(),
+            bluetooth_device_mac=default_mac,
+            bluetooth_enabled=default_mac is not None,
+            bluetooth_want_connected=default_mac is not None,
         )
 
     async def exists(self) -> bool:

@@ -1,10 +1,12 @@
 """API Routes."""
 
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Annotated
 
 from babel.dates import format_date
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Path as PathParam
 
 from vakit_pi import __version__
 from vakit_pi.api.dependencies import AppState, get_app_state
@@ -12,6 +14,8 @@ from vakit_pi.api.schemas import (
     ApiResponse,
     BluetoothConnectRequest,
     BluetoothDeviceSchema,
+    BluetoothPowerRequest,
+    BluetoothStatusSchema,
     CurrentStateSchema,
     LocationSchema,
     MasterVolumeRequest,
@@ -30,7 +34,6 @@ from vakit_pi.domain.models import (
     Location,
     PrayerName,
     PrayerOffsets,
-    PrayerSettings,
     VolumeSettings,
 )
 
@@ -263,7 +266,9 @@ async def update_settings(
             isha=update.volume.isha,
         )
 
-    new_settings = PrayerSettings(
+    # replace(): güncellenmeyen alanlar (Bluetooth durumu dahil) olduğu gibi korunur
+    new_settings = replace(
+        current,
         location=new_location,
         adhan_type=update.adhan_type or current.adhan_type,
         offsets=new_offsets,
@@ -391,17 +396,7 @@ async def set_master_volume(
         maghrib=current.volume.maghrib,
         isha=current.volume.isha,
     )
-    new_settings = PrayerSettings(
-        location=current.location,
-        adhan_type=current.adhan_type,
-        offsets=current.offsets,
-        volume=new_volume,
-        enabled_prayers=current.enabled_prayers,
-        pre_alert_minutes=current.pre_alert_minutes,
-        fajr_isha_method=current.fajr_isha_method,
-        asr_fiqh=current.asr_fiqh,
-        bluetooth_device_mac=current.bluetooth_device_mac,
-    )
+    new_settings = replace(current, volume=new_volume)
     state.settings = new_settings
     state.adhan_service.update_settings(new_settings)
     await state.settings_repository.save(new_settings)
@@ -453,23 +448,77 @@ async def get_bluetooth_devices(
     ]
 
 
+@router.get("/bluetooth/status", response_model=BluetoothStatusSchema)
+async def get_bluetooth_status(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> BluetoothStatusSchema:
+    """Bluetooth durumunu getir (açık/kapalı, seçili hoparlör, bağlantı)."""
+    status_info = await state.bluetooth_manager.status()
+    return BluetoothStatusSchema(
+        enabled=status_info.enabled,
+        powered=status_info.powered,
+        device_mac=status_info.device_mac,
+        want_connected=status_info.want_connected,
+        connected=status_info.connected,
+        last_error=status_info.last_error,
+    )
+
+
+@router.post("/bluetooth/power", response_model=ApiResponse)
+async def bluetooth_power(
+    request: BluetoothPowerRequest,
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ApiResponse:
+    """Bluetooth'u aç veya kapat (tercih kalıcı olarak kaydedilir)."""
+    result = await state.bluetooth_manager.set_enabled(request.enabled)
+    if not result.success:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=result.message)
+    return ApiResponse(success=True, message=result.message)
+
+
+@router.post("/bluetooth/scan", response_model=list[BluetoothDeviceSchema])
+async def bluetooth_scan(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> list[BluetoothDeviceSchema]:
+    """Yakındaki Bluetooth cihazlarını tara (yaklaşık 8 saniye sürer)."""
+    devices = await state.bluetooth_manager.scan()
+    return [
+        BluetoothDeviceSchema(
+            mac=d.mac,
+            name=d.name,
+            connected=d.connected,
+            paired=d.paired,
+            audio=d.audio,
+        )
+        for d in devices
+    ]
+
+
+@router.delete("/bluetooth/devices/{mac}", response_model=ApiResponse)
+async def bluetooth_remove_device(
+    mac: Annotated[str, PathParam(pattern=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")],
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ApiResponse:
+    """Eşleşmiş Bluetooth cihazı sil (eşleşme kaydı kalkar, gerekirse yeniden eşleştirilir)."""
+    result = await state.bluetooth_manager.remove_device(mac)
+    if not result.success:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=result.message)
+    return ApiResponse(success=True, message=result.message)
+
+
 @router.post("/bluetooth/connect", response_model=ApiResponse)
 async def bluetooth_connect(
     request: BluetoothConnectRequest,
     state: Annotated[AppState, Depends(get_app_state)],
 ) -> ApiResponse:
-    """Bluetooth cihaza bağlan ve MAC adresini ayarlara kaydet."""
-    success = await state.bluetooth_adapter.connect(request.mac)
+    """Bluetooth cihaza bağlan (gerekirse eşleştir); seçim kalıcı olarak kaydedilir."""
+    result = await state.bluetooth_manager.connect(request.mac)
 
-    if not success:
+    if not result.success:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Bluetooth bağlantısı başarısız: {request.mac}",
+            detail=f"Bluetooth bağlantısı başarısız: {request.mac} — {result.message}",
         )
-
-    # MAC adresini settings'e kaydet
-    state.settings.bluetooth_device_mac = request.mac
-    await state.settings_repository.save(state.settings)
 
     return ApiResponse(
         success=True,
@@ -481,32 +530,9 @@ async def bluetooth_connect(
 async def bluetooth_disconnect(
     state: Annotated[AppState, Depends(get_app_state)],
 ) -> ApiResponse:
-    """Mevcut Bluetooth bağlantısını kes."""
-    mac = state.settings.bluetooth_device_mac
-    if not mac:
-        return ApiResponse(success=False, message="Kayıtlı Bluetooth cihaz yok.")
+    """Bluetooth bağlantısını kes; elektrik gelince kendiliğinden bağlanılmaz."""
+    result = await state.bluetooth_manager.disconnect()
+    if not result.success:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=result.message)
 
-    success = await state.bluetooth_adapter.disconnect(mac)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Bluetooth bağlantı kesme başarısız: {mac}",
-        )
-
-    return ApiResponse(success=True, message=f"Bluetooth bağlantısı kesildi: {mac}")
-
-
-@router.get("/bluetooth/status")
-async def get_bluetooth_status(
-    state: Annotated[AppState, Depends(get_app_state)],
-) -> dict[str, str | bool | None]:
-    """Bluetooth bağlantı durumunu getir."""
-    mac = state.settings.bluetooth_device_mac
-    connected = False
-    if mac:
-        connected = await state.bluetooth_adapter.is_connected(mac)
-
-    return {
-        "device_mac": mac,
-        "connected": connected,
-    }
+    return ApiResponse(success=True, message=result.message)

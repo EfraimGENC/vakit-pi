@@ -9,6 +9,8 @@ from vakit_pi.services.ports import SystemVolumePort
 
 logger = logging.getLogger(__name__)
 
+SINK_WAIT_ATTEMPTS = 10
+
 
 class PulseAudioVolumeAdapter(SystemVolumePort):
     """PulseAudio üzerinden sistem ses seviyesi kontrolü.
@@ -71,3 +73,30 @@ class PulseAudioVolumeAdapter(SystemVolumePort):
             return int(match.group(1))
 
         return None
+
+    async def set_default_bluetooth_sink(self, mac: str) -> bool:
+        """Bluetooth cihazın sink'ini varsayılan çıkış yap.
+
+        Bağlantıdan hemen sonra sink henüz oluşmamış olabilir; kısa süre yeniden denenir.
+        PulseAudio (`bluez_sink.XX_XX...`) ve PipeWire (`bluez_output.XX_XX...`)
+        adlandırmalarının ikisi de eşleşir.
+        """
+        needle = mac.upper().replace(":", "_")
+
+        for attempt in range(SINK_WAIT_ATTEMPTS):
+            rc, output = await self._run_pactl("list", "short", "sinks")
+            if rc == 0:
+                for line in output.splitlines():
+                    parts = line.split("\t")
+                    name = parts[1] if len(parts) > 1 else ""
+                    if needle in name.upper():
+                        rc, _ = await self._run_pactl("set-default-sink", name)
+                        if rc == 0:
+                            logger.info(f"Varsayılan ses çıkışı ayarlandı: {name}")
+                            return True
+                        return False
+            if attempt < SINK_WAIT_ATTEMPTS - 1:
+                await asyncio.sleep(1.0)
+
+        logger.warning(f"Bluetooth ses çıkışı (sink) bulunamadı: {mac}")
+        return False
