@@ -14,6 +14,9 @@ MAC_PATTERN = re.compile(r"([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})")
 # bluetoothctl çıktısındaki renk/kontrol kodları (ör. "\x1b[0;94m")
 ANSI_PATTERN = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x01|\x02")
 
+# bluetoothctl interaktif istem satırları: "[bluetooth]#", "[bluetooth]# quit", "[CHG] ..." değil
+PROMPT_LINE_PATTERN = re.compile(r"^\[[^\]]*\]#(\s+\w+)?\s*$")
+
 # A2DP sink servisi: hoparlör/kulaklık gibi ses çıkışı cihazlarının işareti
 AUDIO_SINK_MARKERS = ("audio sink", "0000110b")
 
@@ -28,7 +31,11 @@ def strip_ansi(text: str) -> str:
 
 def extract_error(output: str) -> str:
     """bluetoothctl çıktısından kullanıcıya gösterilecek hata satırını çıkar."""
-    lines = [line.strip() for line in strip_ansi(output).splitlines() if line.strip()]
+    lines = [
+        line.strip()
+        for line in strip_ansi(output).splitlines()
+        if line.strip() and not PROMPT_LINE_PATTERN.match(line.strip())
+    ]
     for line in reversed(lines):
         lowered = line.lower()
         if "failed" in lowered or "error" in lowered or "not available" in lowered:
@@ -233,12 +240,14 @@ class BluetoothctlAdapter(BluetoothPort):
         # Trust: cihaz kapanıp açılınca kendiliğinden yeniden bağlanabilsin
         await self._run_command("trust", mac, cmd_timeout=5.0)
 
-        # Pipe yöntemi ile bağlan (interactive mod daha güvenilir)
-        _rc, output = await self._run_piped(f"connect {mac}", cmd_timeout=CONNECT_TIMEOUT)
+        # Tek seferlik komut: bağlantı sonuçlanana kadar bekler ve gerçek sonucu ya da
+        # hatayı yazar. Eskiden komut stdin'e pipe'lanıp hemen ardından çıkış gönderiliyordu;
+        # çıkış bağlantı bitmeden çalışıp hata metnini yutuyordu.
+        _rc, output = await self._run_command("connect", mac, cmd_timeout=CONNECT_TIMEOUT)
         logger.info(f"Bluetooth connect çıktısı: {output[:300]}")
 
         # Bağlantı sonrası gerçek durumu kontrol et (çıktı parse etmek yerine)
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
         if await self.is_connected(mac):
             logger.info(f"Bluetooth bağlantısı başarılı: {mac}")
             return ActionResult(True, "Bağlandı.")

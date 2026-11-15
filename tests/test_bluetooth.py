@@ -173,6 +173,13 @@ class TestParsing:
         out = "Attempting to connect to X\nFailed to connect: org.bluez.Error.Failed\n"
         assert extract_error(out) == "Failed to connect: org.bluez.Error.Failed"
 
+    def test_extract_error_ignores_prompt_lines(self) -> None:
+        out = "Attempting to connect to X\n[bluetooth]# quit\n[bluetooth]#"
+        assert extract_error(out) == "Attempting to connect to X"
+
+    def test_extract_error_on_prompt_only_output(self) -> None:
+        assert "çıktı vermedi" in extract_error("[bluetooth]# quit\n[bluetooth]#")
+
     def test_extract_error_on_empty_output(self) -> None:
         assert "çıktı vermedi" in extract_error("")
 
@@ -211,11 +218,17 @@ class TestAdapterConnect:
         self, adapter: BluetoothctlAdapter, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(asyncio, "sleep", AsyncMock())
-        adapter._run_command.return_value = (0, SPEAKER_INFO)
-        adapter._run_piped.return_value = (0, "Failed to connect: org.bluez.Error.Failed")
+
+        async def run(*args: str, cmd_timeout: float = 10.0) -> tuple[int, str]:  # noqa: ARG001
+            if "connect" in args:
+                return 1, "Attempting to connect to X\nFailed to connect: org.bluez.Error.Failed"
+            return 0, SPEAKER_INFO
+
+        adapter._run_command = AsyncMock(side_effect=run)  # type: ignore[method-assign]
         result = await adapter.connect(MAC)
         assert result.success is False
         assert "org.bluez.Error.Failed" in result.message
+        adapter._run_piped.assert_not_called()  # quit hata metnini yutmasın
 
 
 # ---------- yönetici ----------
