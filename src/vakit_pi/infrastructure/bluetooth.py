@@ -129,9 +129,15 @@ class BluetoothctlAdapter(BluetoothPort):
             return -1, ""
 
     async def _get_info(self, mac: str) -> dict[str, str | bool] | None:
-        """Cihaz bilgisi; BlueZ cihazı tanımıyorsa None."""
+        """Cihaz bilgisi; BlueZ cihazı (henüz) tanımıyorsa None.
+
+        Açılışta bluetoothd/denetleyici hazır değilken `info` cihaz bilgisi yerine
+        "No default controller available" gibi bir metin verir; bu durum "eşleşmemiş"
+        olarak yorumlanmasın diye çıktıda cihazın kendi başlığı aranır.
+        """
         rc, output = await self._run_command("info", mac)
-        if rc != 0 or "not available" in output.lower():
+        lowered = output.lower()
+        if rc != 0 or "not available" in lowered or f"device {mac.lower()}" not in lowered:
             return None
         return parse_info(output)
 
@@ -222,6 +228,12 @@ class BluetoothctlAdapter(BluetoothPort):
             return ActionResult(True, "Zaten bağlı.")
 
         info = await self._get_info(mac)
+        if info is None and not pair_if_needed:
+            # Açılışta BlueZ henüz hazır olmayabilir: geçici durum, eşleşme sorunu değil.
+            return ActionResult(
+                False,
+                "Bluetooth henüz hazır değil ya da cihaz BlueZ'de kayıtlı değil.",
+            )
         if info is None or not info["paired"]:
             if not pair_if_needed:
                 return ActionResult(

@@ -13,6 +13,7 @@ bu niyet temizlenir; elektrik gelince kendiliğinden bağlanılmaz.
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -52,7 +53,7 @@ class BluetoothManager:
         get_settings: SettingsGetter,
         update_settings: SettingsUpdater,
         *,
-        base_delay: float = 3.0,
+        base_delay: float = 1.0,
         max_delay: float = 60.0,
         watchdog_interval: float = 30.0,
     ) -> None:
@@ -64,7 +65,7 @@ class BluetoothManager:
             audio: Varsayılan ses çıkışını ayarlayan adaptör
             get_settings: Güncel ayarları döndürür
             update_settings: Ayar alanlarını değiştirip diske kaydeder (``**changes``)
-            base_delay: Yeniden bağlanma için ilk bekleme (sn)
+            base_delay: Yeniden bağlanma için ilk bekleme (sn); her denemede iki katına çıkar
             max_delay: Yeniden bağlanma beklemesinin üst sınırı (sn)
             watchdog_interval: Bağlıyken bağlantının kontrol sıklığı (sn)
         """
@@ -238,7 +239,9 @@ class BluetoothManager:
     async def _supervise(self, mac: str) -> None:
         """Hoparlöre bağlı kalmaya çalış; vazgeçme, üstel bekleme ile tekrar dene."""
         attempt = 0
+        failed_attempts = 0
         was_connected = False
+        started = time.monotonic()
 
         while True:
             try:
@@ -250,7 +253,13 @@ class BluetoothManager:
                         await self._audio.set_default_bluetooth_sink(mac)
                         self._last_error = None
                         was_connected = True
+                        logger.info(
+                            f"Bluetooth bağlandı: {mac} "
+                            f"({time.monotonic() - started:.0f} sn sonra, "
+                            f"{failed_attempts} başarısız deneme)"
+                        )
                     attempt = 0
+                    failed_attempts = 0
                     await asyncio.sleep(self._watchdog_interval)
                     continue
 
@@ -263,6 +272,7 @@ class BluetoothManager:
                 self._last_error = result.message
                 delay = min(self._base_delay * 2 ** min(attempt, 10), self._max_delay)
                 attempt += 1
+                failed_attempts += 1
                 logger.info(f"Bluetooth bağlanamadı ({result.message}); {delay:.0f}s sonra tekrar")
                 await asyncio.sleep(delay)
             except asyncio.CancelledError:
